@@ -210,6 +210,9 @@ export const enMessages = {
   "settings.translation.modelsFetched": "Models fetched successfully",
   "settings.translation.noChanges": "No changes to save",
   "settings.translation.selectModel": "Select model...",
+  "settings.translation.apiKey.placeholder": "Enter OpenAI API Key...",
+  "settings.translation.apiKey.placeholderUpdate": "Enter new API Key to update...",
+  "settings.translation.apiKey.masked": "Current Key",
 } as const;
 
 export type TranslationKey = keyof typeof enMessages;
