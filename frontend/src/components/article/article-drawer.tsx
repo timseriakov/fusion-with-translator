@@ -189,7 +189,7 @@ export function ArticleDrawer() {
     <Sheet open={selectedArticleId !== null} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-[max(792px,60vw)] p-0"
+        className="w-full sm:max-w-[max(756px,55vw)] p-0"
         showCloseButton={false}
       >
         {article && (
