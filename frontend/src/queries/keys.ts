@@ -41,4 +41,9 @@ export const queryKeys = {
     all: ["bookmarks"] as const,
     list: () => [...queryKeys.bookmarks.all, "list"] as const,
   },
-};
+  translation: {
+    all: ["translation"] as const,
+    settings: () => [...queryKeys.translation.all, "settings"] as const,
+    models: () => [...queryKeys.translation.all, "models"] as const,
+  }
+}

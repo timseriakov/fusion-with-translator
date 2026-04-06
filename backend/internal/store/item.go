@@ -25,7 +25,8 @@ type ListItemsParams struct {
 
 func (s *Store) ListItems(params ListItemsParams) ([]*model.Item, error) {
 	query := `
-		SELECT items.id, items.feed_id, items.guid, items.title, items.link, items.content, items.pub_date, items.unread, items.created_at
+		SELECT items.id, items.feed_id, items.guid, items.title, items.link, items.content, items.pub_date, items.unread, items.created_at,
+			items.translated_title, items.translated_content, COALESCE(items.translation_model, ''), COALESCE(items.translation_target_language, ''), COALESCE(items.translation_updated_at, 0)
 		FROM items
 	`
 	args := []any{}
@@ -76,7 +77,22 @@ func (s *Store) ListItems(params ListItemsParams) ([]*model.Item, error) {
 	for rows.Next() {
 		i := &model.Item{}
 		var unread int
-		if err := rows.Scan(&i.ID, &i.FeedID, &i.GUID, &i.Title, &i.Link, &i.Content, &i.PubDate, &unread, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedID,
+			&i.GUID,
+			&i.Title,
+			&i.Link,
+			&i.Content,
+			&i.PubDate,
+			&unread,
+			&i.CreatedAt,
+			&i.TranslatedTitle,
+			&i.TranslatedContent,
+			&i.TranslationModel,
+			&i.TranslationTargetLanguage,
+			&i.TranslationUpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		i.Unread = intToBool(unread)
@@ -89,10 +105,25 @@ func (s *Store) GetItem(id int64) (*model.Item, error) {
 	i := &model.Item{}
 	var unread int
 	err := s.db.QueryRow(`
-		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at
+		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at, translated_title, translated_content, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
 		FROM items
 		WHERE id = :id
-	`, sql.Named("id", id)).Scan(&i.ID, &i.FeedID, &i.GUID, &i.Title, &i.Link, &i.Content, &i.PubDate, &unread, &i.CreatedAt)
+	`, sql.Named("id", id)).Scan(
+		&i.ID,
+		&i.FeedID,
+		&i.GUID,
+		&i.Title,
+		&i.Link,
+		&i.Content,
+		&i.PubDate,
+		&unread,
+		&i.CreatedAt,
+		&i.TranslatedTitle,
+		&i.TranslatedContent,
+		&i.TranslationModel,
+		&i.TranslationTargetLanguage,
+		&i.TranslationUpdatedAt,
+	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("%w: item", ErrNotFound)
@@ -328,7 +359,7 @@ type ListFeverItemsParams struct {
 
 func (s *Store) ListFeverItems(params ListFeverItemsParams) ([]*model.Item, error) {
 	query := `
-		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at
+		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at, translated_title, translated_content, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
 		FROM items
 		WHERE 1=1
 	`
@@ -375,7 +406,22 @@ func (s *Store) ListFeverItems(params ListFeverItemsParams) ([]*model.Item, erro
 	for rows.Next() {
 		i := &model.Item{}
 		var unread int
-		if err := rows.Scan(&i.ID, &i.FeedID, &i.GUID, &i.Title, &i.Link, &i.Content, &i.PubDate, &unread, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedID,
+			&i.GUID,
+			&i.Title,
+			&i.Link,
+			&i.Content,
+			&i.PubDate,
+			&unread,
+			&i.CreatedAt,
+			&i.TranslatedTitle,
+			&i.TranslatedContent,
+			&i.TranslationModel,
+			&i.TranslationTargetLanguage,
+			&i.TranslationUpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		i.Unread = intToBool(unread)
@@ -499,4 +545,140 @@ func (s *Store) CountItems(params ListItemsParams) (int, error) {
 	var count int
 	err := s.db.QueryRow(query, args...).Scan(&count)
 	return count, err
+}
+
+type UpdateTranslationSettingsParams struct {
+	OpenAIAPIKey              *string
+	TranslationModel          *string
+	TranslationTargetLanguage *string
+}
+
+type SaveItemTranslationInput struct {
+	TranslatedTitle           *string
+	TranslatedContent         *string
+	TranslationModel          string
+	TranslationTargetLanguage string
+	TranslationUpdatedAt      int64
+}
+
+func (s *Store) GetTranslationSettings() (*model.TranslationSettings, error) {
+	settings := &model.TranslationSettings{}
+	err := s.db.QueryRow(`
+		SELECT openai_api_key, translation_model, translation_target_language
+		FROM ai_translation_settings
+		WHERE id = 1
+	`).Scan(
+		&settings.OpenAIAPIKey,
+		&settings.TranslationModel,
+		&settings.TranslationTargetLanguage,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return &model.TranslationSettings{}, nil
+		}
+		return nil, fmt.Errorf("get translation settings: %w", err)
+	}
+
+	return settings, nil
+}
+
+func (s *Store) UpdateTranslationSettings(params UpdateTranslationSettingsParams) (*model.TranslationSettings, error) {
+	if _, err := s.db.Exec(`
+		INSERT INTO ai_translation_settings (id) VALUES (1)
+		ON CONFLICT(id) DO NOTHING
+	`); err != nil {
+		return nil, fmt.Errorf("ensure translation settings row: %w", err)
+	}
+
+	if params.OpenAIAPIKey != nil {
+		if _, err := s.db.Exec(`
+			UPDATE ai_translation_settings
+			SET openai_api_key = :openai_api_key
+			WHERE id = 1
+		`, sql.Named("openai_api_key", *params.OpenAIAPIKey)); err != nil {
+			return nil, fmt.Errorf("update translation api key: %w", err)
+		}
+	}
+
+	if params.TranslationModel != nil {
+		if _, err := s.db.Exec(`
+			UPDATE ai_translation_settings
+			SET translation_model = :translation_model
+			WHERE id = 1
+		`, sql.Named("translation_model", *params.TranslationModel)); err != nil {
+			return nil, fmt.Errorf("update translation model: %w", err)
+		}
+	}
+
+	if params.TranslationTargetLanguage != nil {
+		if _, err := s.db.Exec(`
+			UPDATE ai_translation_settings
+			SET translation_target_language = :translation_target_language
+			WHERE id = 1
+		`, sql.Named("translation_target_language", *params.TranslationTargetLanguage)); err != nil {
+			return nil, fmt.Errorf("update translation target language: %w", err)
+		}
+	}
+
+	return s.GetTranslationSettings()
+}
+
+func (s *Store) GetItemTranslationCache(id int64) (*model.ItemTranslationCache, error) {
+	cache := &model.ItemTranslationCache{}
+	err := s.db.QueryRow(`
+		SELECT id, translated_title, translated_content, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
+		FROM items
+		WHERE id = :id
+	`, sql.Named("id", id)).Scan(
+		&cache.ItemID,
+		&cache.TranslatedTitle,
+		&cache.TranslatedContent,
+		&cache.TranslationModel,
+		&cache.TranslationTargetLanguage,
+		&cache.TranslationUpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%w: item", ErrNotFound)
+		}
+		return nil, fmt.Errorf("get item translation cache: %w", err)
+	}
+
+	return cache, nil
+}
+
+func (s *Store) SaveItemTranslation(id int64, input SaveItemTranslationInput) error {
+	if input.TranslatedTitle == nil && input.TranslatedContent == nil {
+		return fmt.Errorf("%w: translation requires title or content", ErrInvalid)
+	}
+
+	result, err := s.db.Exec(`
+		UPDATE items
+		SET translated_title = :translated_title,
+			translated_content = :translated_content,
+			translation_model = :translation_model,
+			translation_target_language = :translation_target_language,
+			translation_updated_at = :translation_updated_at
+		WHERE id = :id
+	`,
+		sql.Named("translated_title", input.TranslatedTitle),
+		sql.Named("translated_content", input.TranslatedContent),
+		sql.Named("translation_model", input.TranslationModel),
+		sql.Named("translation_target_language", input.TranslationTargetLanguage),
+		sql.Named("translation_updated_at", input.TranslationUpdatedAt),
+		sql.Named("id", id),
+	)
+	if err != nil {
+		return fmt.Errorf("save item translation: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("save item translation rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: item", ErrNotFound)
+	}
+
+	return nil
 }

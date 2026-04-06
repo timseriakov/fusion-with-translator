@@ -66,6 +66,37 @@ type Item struct {
 	PubDate   int64  `json:"pub_date"`
 	Unread    bool   `json:"unread"`
 	CreatedAt int64  `json:"created_at"`
+
+	TranslatedTitle           *string `json:"translated_title,omitempty"`
+	TranslatedContent         *string `json:"translated_content,omitempty"`
+	TranslationModel          string  `json:"translation_model"`
+	TranslationTargetLanguage string  `json:"translation_target_language"`
+	TranslationUpdatedAt      int64   `json:"translation_updated_at"`
+}
+
+// TranslationSettings stores persisted translation configuration.
+type TranslationSettings struct {
+	OpenAIAPIKey              string `json:"openai_api_key"`
+	TranslationModel          string `json:"translation_model"`
+	TranslationTargetLanguage string `json:"translation_target_language"`
+}
+
+// ItemTranslationCache stores cached translation fields for an item.
+type ItemTranslationCache struct {
+	ItemID                    int64   `json:"item_id"`
+	TranslatedTitle           *string `json:"translated_title,omitempty"`
+	TranslatedContent         *string `json:"translated_content,omitempty"`
+	TranslationModel          string  `json:"translation_model"`
+	TranslationTargetLanguage string  `json:"translation_target_language"`
+	TranslationUpdatedAt      int64   `json:"translation_updated_at"`
+}
+
+// OpenAIModel represents a model entry returned by the OpenAI models API.
+type OpenAIModel struct {
+	ID      string `json:"id"`
+	Created int64  `json:"created"`
+	Object  string `json:"object"`
+	OwnedBy string `json:"owned_by"`
 }
 
 // Bookmark represents a saved item snapshot.

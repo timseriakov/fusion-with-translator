@@ -31,6 +31,44 @@ export const sessionAPI = {
 
   logout: () => api.delete<void>("/sessions"),
 };
+// Translation API types
+import type {
+  TranslationSettings,
+  TranslationSettingsUpdateRequest,
+  TranslationModelResponse,
+  TranslateItemRequest,
+} from "./types";
+
+// Translation APIs
+export const translationAPI = {
+  getSettings: () =>
+    api.get<APIResponse<TranslationSettings>>(
+      "/translation/settings",
+    ),
+
+  updateSettings: (data: TranslationSettingsUpdateRequest) =>
+    api.patch<APIResponse<TranslationSettings>>(
+      "/translation/settings",
+      data,
+    ),
+
+  getModels: () =>
+    api.get<APIResponse<TranslationModelResponse>>(
+      "/translation/models",
+    ),
+
+  translateItem: (itemId: number, data?: TranslateItemRequest) => {
+    const query = new URLSearchParams();
+    if (data?.force) {
+      query.set("force", "true");
+    }
+
+    const queryString = query.toString();
+    return api.post<APIResponse<Item>>(
+      `/translation/items/${itemId}${queryString ? `?${queryString}` : ""}`,
+    );
+  },
+};
 
 // OIDC APIs
 export const oidcAPI = {

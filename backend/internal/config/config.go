@@ -36,6 +36,7 @@ type Config struct {
 	OIDCClientSecret string // OAuth2 client secret
 	OIDCRedirectURI  string // Callback URL (required when OIDC is enabled)
 	OIDCAllowedUser  string // Optional: restrict to specific user identity (email or sub)
+	OpenAIAPIKey     string // OpenAI API key for translation features.
 }
 
 func Load() (*Config, error) {
@@ -151,6 +152,7 @@ func Load() (*Config, error) {
 		OIDCClientSecret: os.Getenv("FUSION_OIDC_CLIENT_SECRET"),
 		OIDCRedirectURI:  os.Getenv("FUSION_OIDC_REDIRECT_URI"),
 		OIDCAllowedUser:  os.Getenv("FUSION_OIDC_ALLOWED_USER"),
+		OpenAIAPIKey:     strings.TrimSpace(os.Getenv("FUSION_OPENAI_API_KEY")),
 	}, nil
 }
 

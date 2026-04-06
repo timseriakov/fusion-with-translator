@@ -11,7 +11,7 @@ func TestMigrate(t *testing.T) {
 	defer closeStore(t, store)
 
 	// Verify all expected tables exist
-	tables := []string{"groups", "feeds", "feed_fetch_state", "items", "bookmarks", "schema_migrations", "items_fts"}
+	tables := []string{"groups", "feeds", "feed_fetch_state", "items", "bookmarks", "schema_migrations", "items_fts", "ai_translation_settings"}
 	for _, table := range tables {
 		var count int
 		query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=:table"
@@ -24,6 +24,36 @@ func TestMigrate(t *testing.T) {
 			t.Errorf("expected table %s to exist, but it doesn't", table)
 		}
 	}
+
+	t.Run("creates translation columns", func(t *testing.T) {
+		itemColumns := []string{"translated_title", "translated_content", "translation_model", "translation_target_language", "translation_updated_at"}
+		for _, column := range itemColumns {
+			var count int
+			query := "SELECT COUNT(*) FROM pragma_table_info('items') WHERE name = :column"
+			err := store.db.QueryRow(query, sql.Named("column", column)).Scan(&count)
+			if err != nil {
+				t.Errorf("failed to check items.%s column: %v", column, err)
+				continue
+			}
+			if count != 1 {
+				t.Errorf("expected items.%s column to exist, but it doesn't", column)
+			}
+		}
+
+		settingsColumns := []string{"id", "openai_api_key", "translation_model", "translation_target_language"}
+		for _, column := range settingsColumns {
+			var count int
+			query := "SELECT COUNT(*) FROM pragma_table_info('ai_translation_settings') WHERE name = :column"
+			err := store.db.QueryRow(query, sql.Named("column", column)).Scan(&count)
+			if err != nil {
+				t.Errorf("failed to check ai_translation_settings.%s column: %v", column, err)
+				continue
+			}
+			if count != 1 {
+				t.Errorf("expected ai_translation_settings.%s column to exist, but it doesn't", column)
+			}
+		}
+	})
 }
 
 func TestMigrateIdempotent(t *testing.T) {

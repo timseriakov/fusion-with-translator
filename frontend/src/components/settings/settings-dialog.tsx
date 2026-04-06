@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { Bug, Download, Github, Info, Keyboard, Palette } from "lucide-react";
+import { Bug, Download, Github, Info, Keyboard, Palette, Wrench } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +20,9 @@ import {
 import { usePWAInstall } from "@/hooks/use-pwa-install";
 import { localeLabels, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { TranslationSettingsContent } from "./translation-settings-content";
 
-type SettingsTab = "appearance" | "about";
+type SettingsTab = "appearance" | "aiTranslation" | "about";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -239,6 +240,7 @@ export function SettingsDialog() {
 
   const tabTitles: Record<SettingsTab, string> = {
     appearance: t("settings.tab.appearance"),
+    aiTranslation: t("settings.tab.aiTranslation"),
     about: t("settings.tab.about"),
   };
 
@@ -258,6 +260,12 @@ export function SettingsDialog() {
               onClick={() => setActiveTab("appearance")}
             />
             <NavItem
+              icon={<Wrench className="h-4 w-4" />}
+              label={t("settings.tab.aiTranslation")}
+              active={activeTab === "aiTranslation"}
+              onClick={() => setActiveTab("aiTranslation")}
+            />
+            <NavItem
               icon={<Info className="h-4 w-4" />}
               label={t("settings.tab.about")}
               active={activeTab === "about"}
@@ -274,6 +282,9 @@ export function SettingsDialog() {
 
           <div className="flex-1 overflow-y-auto">
             {activeTab === "appearance" && <AppearanceContent />}
+            {activeTab === "aiTranslation" && (
+              <TranslationSettingsContent onOpenTranslationHelp={() => {}} />
+            )}
             {activeTab === "about" && <AboutContent />}
           </div>
         </div>

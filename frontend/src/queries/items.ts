@@ -8,7 +8,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { itemAPI, type Feed, type Item, type ListItemsParams } from "@/lib/api";
+import { itemAPI, translationAPI, type Feed, type Item, type ListItemsParams } from "@/lib/api";
 import {
   normalizeItemFilters,
   queryKeys,
@@ -218,4 +218,79 @@ export function useMarkItemsRead() {
 
 export function useMarkItemsUnread() {
   return useSetItemsReadState(true);
+}
+
+// Translation query/mutation helpers
+export const translationQueries = {
+  settings: queryOptions({
+    queryKey: queryKeys.translation.settings(),
+    queryFn: async () => {
+      const res = await translationAPI.getSettings();
+      return res.data;
+    },
+  }),
+
+  models: queryOptions({
+    queryKey: queryKeys.translation.models(),
+    queryFn: async () => {
+      const res = await translationAPI.getModels();
+      return res.data;
+    },
+  }),
+};
+
+export function useTranslationSettings() {
+  return useQuery(translationQueries.settings);
+}
+
+export function useTranslationModels() {
+  return useQuery(translationQueries.models);
+}
+
+export function useTranslateItem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      options,
+    }: {
+      itemId: number;
+      options?: { force?: boolean };
+    }) => {
+      return translationAPI.translateItem(itemId, options);
+    },
+    onSuccess: (_data, { itemId }) => {
+      // Invalidate item detail and list queries to refresh with new translation
+      qc.invalidateQueries({
+        queryKey: queryKeys.items.detail(itemId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.items.lists(),
+      });
+      // Invalidate translation settings and models queries as they may have changed
+      qc.invalidateQueries({
+        queryKey: queryKeys.translation.settings(),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.translation.models(),
+      });
+    },
+  });
+}
+
+export function useUpdateTranslationSettings() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: Parameters<typeof translationAPI.updateSettings>[0]) => {
+      return translationAPI.updateSettings(data);
+    },
+    onSuccess: () => {
+      // Invalidate translation settings query to trigger refetch
+      qc.invalidateQueries({
+        queryKey: queryKeys.translation.settings(),
+      });
+    },
+  });
 }

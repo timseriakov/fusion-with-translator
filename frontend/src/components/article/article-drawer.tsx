@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Circle,
   CircleCheck,
@@ -7,6 +7,9 @@ import {
   ExternalLink,
   Star,
   X,
+  Languages,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -18,6 +21,8 @@ import {
   useItems,
   useMarkItemsRead,
   useMarkItemsUnread,
+  useTranslateItem,
+  useTranslationSettings,
 } from "@/queries/items";
 import { useFeedLookup } from "@/queries/feeds";
 import {
@@ -158,6 +163,28 @@ export function ArticleDrawer() {
       onOpenOriginal: handleOpenOriginal,
     });
 
+  const [showTranslated, setShowTranslated] = useState(false);
+  const translateItem = useTranslateItem();
+  const { data: translationSettings } = useTranslationSettings();
+
+  // Reset showTranslated when article changes
+  useEffect(() => {
+    setShowTranslated(false);
+  }, [selectedArticleId]);
+
+  const hasTranslation = Boolean(article?.translated_title || article?.translated_content);
+  const isTranslationEnabled = Boolean(translationSettings?.has_api_key);
+
+  const handleTranslate = async (force = false) => {
+    if (!article) return;
+    try {
+      await translateItem.mutateAsync({ itemId: article.id, options: { force } });
+      setShowTranslated(true);
+    } catch (error) {
+      console.error("Failed to translate article:", error);
+    }
+  };
+
   return (
     <Sheet open={selectedArticleId !== null} onOpenChange={handleOpenChange}>
       <SheetContent
@@ -221,6 +248,57 @@ export function ArticleDrawer() {
                     </>
                   )}
                 </Button>
+
+                {isTranslationEnabled && (
+                  <div className="flex items-center gap-2 border-l pl-2 ml-1">
+                    {!hasTranslation ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTranslate()}
+                        disabled={translateItem.isPending}
+                        className="h-auto gap-1.5 px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground"
+                      >
+                        {translateItem.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Languages className="h-4 w-4" />
+                        )}
+                        {translateItem.isPending
+                          ? t("article.action.translating")
+                          : t("article.action.translate")}
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowTranslated(!showTranslated)}
+                          className="h-auto gap-1.5 px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground"
+                        >
+                          <Languages className="h-4 w-4" />
+                          {showTranslated
+                            ? t("article.action.showOriginal")
+                            : t("article.action.showTranslated")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTranslate(true)}
+                          disabled={translateItem.isPending}
+                          className="h-auto px-2 py-1.5 text-muted-foreground"
+                          title={t("article.action.retranslate")}
+                        >
+                          {translateItem.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <SheetTitle className="sr-only">{article.title}</SheetTitle>
@@ -235,12 +313,20 @@ export function ArticleDrawer() {
               </Button>
             </div>
 
+            {translateItem.isError && (
+              <div className="bg-destructive/10 px-4 py-2 text-xs text-destructive sm:px-6">
+                {t("article.translation.failed")}
+              </div>
+            )}
+
             {/* Content */}
             <ScrollArea className="min-h-0 flex-1">
               <article className="min-w-0 px-5 py-6 sm:px-12 sm:py-8">
                 <div className="space-y-3">
                   <h1 className="text-[28px] font-bold leading-[1.3]">
-                    {article.title}
+                    {showTranslated && article.translated_title
+                      ? article.translated_title
+                      : article.title}
                   </h1>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                     {article.feed_id > 0 ? (
@@ -286,7 +372,9 @@ export function ArticleDrawer() {
                   className="prose prose-neutral mt-6 min-w-0 max-w-none break-words dark:prose-invert"
                   dangerouslySetInnerHTML={{
                     __html: processArticleContent(
-                      article.content,
+                      showTranslated && article.translated_content
+                        ? article.translated_content
+                        : article.content,
                       safeArticleLink ?? undefined,
                     ),
                   }}

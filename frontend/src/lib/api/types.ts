@@ -37,15 +37,21 @@ export interface FeedFetchState {
 }
 
 export interface Item {
-  id: number;
-  feed_id: number;
-  guid: string;
-  title: string;
-  link: string;
-  content: string;
-  pub_date: number;
-  unread: boolean;
-  created_at: number;
+id: number;
+feed_id: number;
+guid: string;
+title: string;
+link: string;
+content: string;
+pub_date: number;
+unread: boolean;
+created_at: number;
+// Translation fields
+translated_title?: string | null;
+translated_content?: string | null;
+translation_model?: string | null;
+translation_target_language?: string | null;
+translation_updated_at?: number | null;
 }
 
 export interface Bookmark {
@@ -182,4 +188,34 @@ export interface OIDCStatusResponse {
 
 export interface OIDCLoginResponse {
   auth_url: string;
+}
+
+// Translation API types
+export interface TranslationSettings {
+  has_api_key: boolean;
+  masked_api_key: string;
+  api_key_source: "env" | "db";
+  translation_model: string;
+  translation_target_language: string;
+}
+
+export interface TranslationSettingsUpdateRequest {
+  openai_api_key?: string;
+  translation_model?: string;
+  translation_target_language?: string;
+}
+
+export interface OpenAIModel {
+  id: string;
+  created: number;
+  object: "model";
+  owned_by: string;
+}
+
+export interface TranslationModelResponse {
+  models: OpenAIModel[];
+}
+
+export interface TranslateItemRequest {
+  force?: boolean;
 }

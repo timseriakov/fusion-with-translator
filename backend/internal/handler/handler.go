@@ -24,11 +24,13 @@ type Handler struct {
 		RefreshFeed(ctx context.Context, feedID int64) error
 		RefreshAll(ctx context.Context) (int, error)
 	}
-	sessions  map[string]int64        // sessionID -> unix expiry seconds
-	mu        sync.RWMutex            // protects sessions state
-	oidcAuth  *auth.OIDCAuthenticator // nil when OIDC is disabled
-	limiter   *loginLimiter
-	lastSweep int64
+	translationModelsFetcher translationModelsFetcher
+	itemTranslator           itemTranslator
+	sessions                 map[string]int64        // sessionID -> unix expiry seconds
+	mu                       sync.RWMutex            // protects sessions state
+	oidcAuth                 *auth.OIDCAuthenticator // nil when OIDC is disabled
+	limiter                  *loginLimiter
+	lastSweep                int64
 
 	refreshAllMu      sync.Mutex
 	refreshAllRunning bool
@@ -54,6 +56,8 @@ func New(store *store.Store, config *config.Config, puller interface {
 		sessions:     make(map[string]int64),
 		limiter:      newLoginLimiter(config.LoginRateLimit, config.LoginWindow, config.LoginBlock),
 	}
+	h.translationModelsFetcher = newOpenAITranslationModelsFetcher(h.config)
+	h.itemTranslator = newItemTranslator(h.config)
 
 	if h.allowAnonAPI {
 		slog.Warn("authentication is disabled because both password and OIDC are empty")
@@ -134,6 +138,11 @@ func (h *Handler) SetupRouter() *gin.Engine {
 			auth.GET("/items/:id", h.getItem)
 			auth.PATCH("/items/-/read", h.markItemsRead)
 			auth.PATCH("/items/-/unread", h.markItemsUnread)
+
+			auth.GET("/translation/settings", h.getTranslationSettings)
+			auth.PATCH("/translation/settings", h.patchTranslationSettings)
+			auth.GET("/translation/models", h.getTranslationModels)
+			auth.POST("/translation/items/:id", h.translateItem)
 
 			auth.GET("/search", h.search)
 
