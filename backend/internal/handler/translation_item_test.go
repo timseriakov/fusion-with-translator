@@ -294,5 +294,38 @@ func TestTranslateItem(t *testing.T) {
 		if item.TranslatedTitle != nil || item.TranslatedContent != nil || item.TranslationUpdatedAt != 0 {
 			t.Fatalf("expected no translation to be saved after empty outputs, got %+v", item)
 		}
+
+	})
+
+	t.Run("translates html with unclosed p tags (HN-style)", func(t *testing.T) {
+		h, st := newTranslationItemTestHandler(t, &config.Config{})
+		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
+		// Unclosed <p> tags are valid HTML5 — browsers auto-close them.
+		// The parser normalises them: each <p> becomes properly closed.
+		content := "<p>Hello all<p>- Item one\n- Item two<p>Closing line</p>"
+		itemID := seedTranslationItemFixture(t, st, "Original title", content)
+
+		translator := &stubItemTranslator{responses: []stubTranslationResult{
+			{output: "Перевод заголовка"},
+			// LLM returns multi-line node [1] as continuation lines (no [N] prefix)
+			{output: "[0] Привет всем\n[1] - Пункт один\n- Пункт два\n[2] Заключение"},
+		}}
+		h.itemTranslator = translator
+
+		w := performRequest(h.SetupRouter(), http.MethodPost, fmt.Sprintf("/api/translation/items/%d", itemID), nil, nil)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+		}
+
+		response := decodeTranslateItemResponse(t, w.Body.Bytes())
+		if response.Data.TranslatedContent == nil {
+			t.Fatal("expected translated content to be present")
+		}
+		if !strings.Contains(*response.Data.TranslatedContent, "Привет всем") {
+			t.Fatalf("expected translated content to contain 'Привет всем', got %q", *response.Data.TranslatedContent)
+		}
+		if !strings.Contains(*response.Data.TranslatedContent, "Пункт один") || !strings.Contains(*response.Data.TranslatedContent, "Пункт два") {
+			t.Fatalf("expected multi-line translation preserved, got %q", *response.Data.TranslatedContent)
+		}
 	})
 }

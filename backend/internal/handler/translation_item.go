@@ -479,20 +479,25 @@ func splitWhitespace(value string) (string, string, string) {
 
 func parseNumberedTranslations(output string, expected int) (map[int]string, error) {
 	translations := make(map[int]string, expected)
+	lastIndex := -1
 	for _, rawLine := range strings.Split(output, "\n") {
 		line := strings.TrimSpace(rawLine)
 		if line == "" {
 			continue
 		}
 		index, text, ok := parseNumberedLine(line)
-		if !ok || index < 0 || index >= expected {
+		if ok && index >= 0 && index < expected {
+			if strings.TrimSpace(text) == "" {
+				return nil, errTranslatedHTMLInvalid
+			}
+			translations[index] = strings.TrimSpace(text)
+			lastIndex = index
+		} else if lastIndex >= 0 {
+			// Continuation line for a multi-line text node.
+			translations[lastIndex] += "\n" + line
+		} else {
 			return nil, errTranslatedHTMLInvalid
 		}
-		trimmedText := strings.TrimSpace(text)
-		if trimmedText == "" {
-			return nil, errTranslatedHTMLInvalid
-		}
-		translations[index] = trimmedText
 	}
 	if len(translations) != expected {
 		return nil, errTranslatedHTMLInvalid
