@@ -33,6 +33,7 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
   // Separate state for model and target language
   const [translationModel, setTranslationModel] = useState("");
   const [translationTargetLanguage, setTranslationTargetLanguage] = useState("ru");
+  const [openaiAPIKey, setOpenaiAPIKey] = useState("");
 
   // Fetch current settings
   const { data: settings, isLoading: settingsLoading, error: settingsError } =
@@ -51,7 +52,7 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
   const updateSettings = useUpdateTranslationSettings();
 
   const handleUpdateSettings = () => {
-    const updatePayload: { translation_model?: string; translation_target_language?: string } = {};
+    const updatePayload: { translation_model?: string; translation_target_language?: string; openai_api_key?: string } = {};
 
     if (translationTargetLanguage !== settings?.translation_target_language) {
       updatePayload.translation_target_language = translationTargetLanguage;
@@ -61,14 +62,19 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
       updatePayload.translation_model = translationModel;
     }
 
-    if (Object.keys(updatePayload).length === 0) {
-      // No changes to save
-      toast.info(t("settings.translation.noChanges"));
-      return;
+    if (openaiAPIKey.trim()) {
+      updatePayload.openai_api_key = openaiAPIKey.trim();
     }
+
+if (Object.keys(updatePayload).length === 0) {
+// No changes to save
+toast.info(t("settings.translation.noChanges"));
+return;
+}
     updateSettings.mutate(updatePayload as any, {
       onSuccess: () => {
         toast.success(t("settings.translation.settingsUpdated"));
+        setOpenaiAPIKey("");
       },
       onError: (_error) => {
         toast.error(t("settings.translation.updateFailed"));
@@ -146,6 +152,39 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
             </div>
           </div>
         </div>
+
+        {/* API Key Input Section */}
+        <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+          {settings?.api_key_source === "env" ? (
+            <div className="space-y-1.5">
+              <Input
+                value={settings.masked_api_key}
+                readOnly
+                disabled
+                className="bg-muted/50 font-mono text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {t("settings.translation.apiKey.sourceEnv")}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Input
+                type="password"
+                value={openaiAPIKey}
+                onChange={(e) => setOpenaiAPIKey(e.target.value)}
+                placeholder={settings?.has_api_key ? t("settings.translation.apiKey.placeholderUpdate") : t("settings.translation.apiKey.placeholder")}
+                disabled={updateSettings.isPending}
+                className="font-mono text-xs"
+              />
+              {settings?.has_api_key && (
+                <p className="text-[11px] text-muted-foreground">
+                  {t("settings.translation.apiKey.masked")}: {settings.masked_api_key}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Translation Model Section */}
@@ -180,19 +219,10 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Input
-            value={translationModel}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              setTranslationModel(e.target.value);
-            }}
-            placeholder={t("settings.translation.model.manualPlaceholder")}
-            disabled={updateSettings.isPending}
-            className="flex-1"
-          />
-          {models && models.models.length > 0 && (
-            <Select value={translationModel} onValueChange={setTranslationModel}>
-              <SelectTrigger className="w-[200px]">
+        <div>
+          {models && models.models.length > 0 ? (
+            <Select value={translationModel} onValueChange={setTranslationModel} disabled={updateSettings.isPending}>
+              <SelectTrigger>
                 <SelectValue placeholder={t("settings.translation.selectModel")} />
               </SelectTrigger>
               <SelectContent>
@@ -203,6 +233,15 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
                 ))}
               </SelectContent>
             </Select>
+          ) : (
+            <Input
+              value={translationModel}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                setTranslationModel(e.target.value);
+              }}
+              placeholder={t("settings.translation.model.manualPlaceholder")}
+              disabled={updateSettings.isPending}
+            />
           )}
         </div>
 
