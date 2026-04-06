@@ -196,10 +196,10 @@ func TestTranslateItem(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid html content still succeeds with title-only translation", func(t *testing.T) {
+	t.Run("empty content results in title-only translation", func(t *testing.T) {
 		h, st := newTranslationItemTestHandler(t, &config.Config{})
 		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
-		itemID := seedTranslationItemFixture(t, st, "Original title", "<p>Hello")
+		itemID := seedTranslationItemFixture(t, st, "Original title", "")
 
 		translator := &stubItemTranslator{responses: []stubTranslationResult{{output: "Перевод заголовка"}}}
 		h.itemTranslator = translator

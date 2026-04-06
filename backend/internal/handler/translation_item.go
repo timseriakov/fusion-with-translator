@@ -167,8 +167,12 @@ func (h *Handler) translateItem(c *gin.Context) {
 	if !force {
 		cache, err := h.store.GetItemTranslationCache(id)
 		if err == nil && cache.TranslationModel == settings.TranslationModel && cache.TranslationTargetLanguage == settings.TranslationTargetLanguage && cache.TranslationUpdatedAt > 0 && (cache.TranslatedTitle != nil || cache.TranslatedContent != nil) {
-			dataResponse(c, item)
-			return
+			// Cache miss if content exists but was never translated (e.g. cached before plain-text fallback was added)
+			contentNeedsTranslation := itemContentIsTranslatable(item.Content)
+			if !contentNeedsTranslation || cache.TranslatedContent != nil {
+				dataResponse(c, item)
+				return
+			}
 		}
 	}
 
@@ -285,10 +289,6 @@ func classifyHTMLFragment(content string) htmlFragmentState {
 
 	nodes, err := html.ParseFragment(strings.NewReader(trimmed), nil)
 	if err != nil || !hasElementNode(nodes) {
-		return htmlFragmentInvalid
-	}
-
-	if !hasBalancedHTMLTokens(trimmed) {
 		return htmlFragmentInvalid
 	}
 
@@ -582,4 +582,18 @@ func collectStructure(node *html.Node, result *[]htmlNodeInfo) {
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		collectStructure(child, result)
 	}
+}
+
+// itemContentIsTranslatable reports whether item content should be translated.
+// Returns true for valid HTML fragments and plain text (no HTML tags).
+// Broken HTML (has '<' but is malformed) returns false.
+func itemContentIsTranslatable(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return false
+	}
+	if strings.Contains(trimmed, "<") {
+		return classifyHTMLFragment(trimmed) == htmlFragmentValid
+	}
+	return true // plain text
 }
