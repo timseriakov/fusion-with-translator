@@ -17,6 +17,7 @@ import (
 	"github.com/0x2E/fusion/internal/store"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 const openAIChatURL = "https://api.openai.com/v1/chat/completions"
@@ -287,7 +288,7 @@ func classifyHTMLFragment(content string) htmlFragmentState {
 		return htmlFragmentInvalid
 	}
 
-	nodes, err := html.ParseFragment(strings.NewReader(trimmed), nil)
+	nodes, err := html.ParseFragment(strings.NewReader(trimmed), &html.Node{Type: html.ElementNode, DataAtom: atom.Div, Data: "div"})
 	if err != nil || !hasElementNode(nodes) {
 		return htmlFragmentInvalid
 	}
@@ -402,7 +403,7 @@ func translateHTMLContent(ctx context.Context, translator itemTranslator, apiKey
 }
 
 func extractTextNodes(content string) (string, []textNodeInfo, error) {
-	nodes, err := html.ParseFragment(strings.NewReader(content), nil)
+	nodes, err := html.ParseFragment(strings.NewReader(content), &html.Node{Type: html.ElementNode, DataAtom: atom.Div, Data: "div"})
 	if err != nil {
 		return "", nil, fmt.Errorf("parse html fragment: %w", err)
 	}
@@ -553,7 +554,7 @@ func validateHTMLStructure(original, translated string) bool {
 }
 
 func extractStructure(content string) ([]htmlNodeInfo, bool) {
-	nodes, err := html.ParseFragment(strings.NewReader(content), nil)
+	nodes, err := html.ParseFragment(strings.NewReader(content), &html.Node{Type: html.ElementNode, DataAtom: atom.Div, Data: "div"})
 	if err != nil {
 		return nil, false
 	}
