@@ -221,6 +221,34 @@ func TestTranslateItem(t *testing.T) {
 		}
 	})
 
+	t.Run("plain text content is translated directly", func(t *testing.T) {
+		h, st := newTranslationItemTestHandler(t, &config.Config{})
+		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
+		itemID := seedTranslationItemFixture(t, st, "Original title", "Just plain text, no HTML tags here.")
+
+		translator := &stubItemTranslator{responses: []stubTranslationResult{
+			{output: "Перевод заголовка"},
+			{output: "Просто обычный текст, без HTML тегов."},
+		}}
+		h.itemTranslator = translator
+
+		w := performRequest(h.SetupRouter(), http.MethodPost, fmt.Sprintf("/api/translation/items/%d", itemID), nil, nil)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if len(translator.calls) != 2 {
+			t.Fatalf("expected 2 translation calls (title + content), got %d", len(translator.calls))
+		}
+
+		response := decodeTranslateItemResponse(t, w.Body.Bytes())
+		if response.Data.TranslatedTitle == nil || *response.Data.TranslatedTitle != "Перевод заголовка" {
+			t.Fatalf("expected translated title, got %#v", response.Data.TranslatedTitle)
+		}
+		if response.Data.TranslatedContent == nil || *response.Data.TranslatedContent != "Просто обычный текст, без HTML тегов." {
+			t.Fatalf("expected translated plain text content, got %#v", response.Data.TranslatedContent)
+		}
+	})
+
 	t.Run("rejects structurally invalid translated html and does not save", func(t *testing.T) {
 		h, st := newTranslationItemTestHandler(t, &config.Config{})
 		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")

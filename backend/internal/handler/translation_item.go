@@ -218,6 +218,23 @@ func (h *Handler) translateItem(c *gin.Context) {
 		if translatedHTML != "" {
 			translatedContent = &translatedHTML
 		}
+	} else if trimmedContent := strings.TrimSpace(item.Content); trimmedContent != "" && !strings.Contains(trimmedContent, "<") {
+		// Plain text content — translate directly without HTML parsing
+		translated, err := translator.Translate(
+			c.Request.Context(),
+			apiKey,
+			settings.TranslationModel,
+			fmt.Sprintf("Translate the following plain text to %s. Return only the translated text.", settings.TranslationTargetLanguage),
+			trimmedContent,
+		)
+		if err != nil {
+			internalError(c, fmt.Errorf("translate item content: %w", err), "translate item content")
+			return
+		}
+		translated = strings.TrimSpace(translated)
+		if translated != "" {
+			translatedContent = &translated
+		}
 	}
 
 	if translatedTitle == nil && translatedContent == nil {
