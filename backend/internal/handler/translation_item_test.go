@@ -23,6 +23,7 @@ type translateItemPayload struct {
 	Content                   string  `json:"content"`
 	TranslatedTitle           *string `json:"translated_title"`
 	TranslatedContent         *string `json:"translated_content"`
+	TranslatedExcerpt         *string `json:"translated_excerpt"`
 	TranslationModel          string  `json:"translation_model"`
 	TranslationTargetLanguage string  `json:"translation_target_language"`
 	TranslationUpdatedAt      int64   `json:"translation_updated_at"`
@@ -114,9 +115,11 @@ func TestTranslateItem(t *testing.T) {
 
 		cachedTitle := "Кэшированный заголовок"
 		cachedContent := "<p>Привет <strong>мир</strong></p>"
+		cachedExcerpt := "Привет мир"
 		if err := st.SaveItemTranslation(itemID, store.SaveItemTranslationInput{
 			TranslatedTitle:           &cachedTitle,
 			TranslatedContent:         &cachedContent,
+			TranslatedExcerpt:         &cachedExcerpt,
 			TranslationModel:          "gpt-4o-mini",
 			TranslationTargetLanguage: "ru",
 			TranslationUpdatedAt:      1710000000,
@@ -141,6 +144,9 @@ func TestTranslateItem(t *testing.T) {
 		}
 		if response.Data.TranslatedContent == nil || *response.Data.TranslatedContent != cachedContent {
 			t.Fatalf("expected cached translated content %q, got %#v", cachedContent, response.Data.TranslatedContent)
+		}
+		if response.Data.TranslatedExcerpt == nil || *response.Data.TranslatedExcerpt != "Привет мир" {
+			t.Fatalf("expected cached translated excerpt \"Привет мир\", got %#v", response.Data.TranslatedExcerpt)
 		}
 		if response.Data.TranslationUpdatedAt != 1710000000 {
 			t.Fatalf("expected cached translation_updated_at 1710000000, got %d", response.Data.TranslationUpdatedAt)
@@ -185,6 +191,9 @@ func TestTranslateItem(t *testing.T) {
 		if response.Data.TranslatedContent == nil {
 			t.Fatal("expected refreshed translated content to be present")
 		}
+		if response.Data.TranslatedExcerpt == nil || *response.Data.TranslatedExcerpt == "" {
+			t.Fatal("expected refreshed translated excerpt to be present")
+		}
 		if !validateHTMLStructure("<p>Hello <strong>world</strong></p>", *response.Data.TranslatedContent) {
 			t.Fatalf("expected translated content to preserve structure, got %q", *response.Data.TranslatedContent)
 		}
@@ -219,6 +228,9 @@ func TestTranslateItem(t *testing.T) {
 		if response.Data.TranslatedContent != nil {
 			t.Fatalf("expected translated content to stay nil, got %#v", response.Data.TranslatedContent)
 		}
+		if response.Data.TranslatedExcerpt != nil {
+			t.Fatalf("expected translated excerpt to stay nil, got %#v", response.Data.TranslatedExcerpt)
+		}
 	})
 
 	t.Run("plain text content is translated directly", func(t *testing.T) {
@@ -246,6 +258,9 @@ func TestTranslateItem(t *testing.T) {
 		}
 		if response.Data.TranslatedContent == nil || *response.Data.TranslatedContent != "Просто обычный текст, без HTML тегов." {
 			t.Fatalf("expected translated plain text content, got %#v", response.Data.TranslatedContent)
+		}
+		if response.Data.TranslatedExcerpt == nil || *response.Data.TranslatedExcerpt != "Просто обычный текст, без HTML тегов." {
+			t.Fatalf("expected translated plain text excerpt, got %#v", response.Data.TranslatedExcerpt)
 		}
 	})
 
@@ -294,7 +309,6 @@ func TestTranslateItem(t *testing.T) {
 		if item.TranslatedTitle != nil || item.TranslatedContent != nil || item.TranslationUpdatedAt != 0 {
 			t.Fatalf("expected no translation to be saved after empty outputs, got %+v", item)
 		}
-
 	})
 
 	t.Run("translates html with unclosed p tags (HN-style)", func(t *testing.T) {
