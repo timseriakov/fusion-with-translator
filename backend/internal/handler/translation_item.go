@@ -37,7 +37,7 @@ type openAIItemTranslator struct {
 
 func newItemTranslator(cfg *config.Config) itemTranslator {
 	allowPrivateFeeds := cfg != nil && cfg.AllowPrivateFeeds
-	client, err := httpc.NewClient(60*time.Second, "", allowPrivateFeeds)
+	client, err := httpc.NewClient(120*time.Second, "", allowPrivateFeeds)
 	if err != nil {
 		return &openAIItemTranslator{client: http.DefaultClient}
 	}
@@ -45,8 +45,9 @@ func newItemTranslator(cfg *config.Config) itemTranslator {
 }
 
 type openAIChatRequest struct {
-	Model    string              `json:"model"`
-	Messages []openAIChatMessage `json:"messages"`
+	Model     string              `json:"model"`
+	Messages  []openAIChatMessage `json:"messages"`
+	MaxTokens int                 `json:"max_tokens,omitempty"`
 }
 
 type openAIChatMessage struct {
@@ -73,6 +74,7 @@ func (t *openAIItemTranslator) Translate(ctx context.Context, apiKey, model, sys
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
+		MaxTokens: 4096,
 	}
 
 	body, err := json.Marshal(payload)
