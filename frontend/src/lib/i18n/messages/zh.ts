@@ -201,7 +201,6 @@ export const zhMessages: PartialMessages = {
   "settings.translation.targetLanguage.description": "文章翻译的目标语言",
   "settings.translation.autoMode.label": "自动翻译模式",
   "settings.translation.autoMode.description": "自动翻译列表中的文章以及打开时的文章",
-    "自动翻译列表中的文章以及打开时的文章",
   "settings.translation.settingsUpdated": "设置已成功更新",
   "settings.translation.fetchFailed": "获取模型失败",
   "settings.translation.updateFailed": "更新设置失败",

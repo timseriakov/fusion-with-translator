@@ -1,0 +1,37 @@
+SCENARIO: translation mutation path refreshes item consumers after success
+Tool: Read + Bash
+Preconditions: translation settings/model/item hooks implemented
+Steps:
+1. Read `frontend/src/queries/items.ts` and `frontend/src/queries/keys.ts` to confirm translation success invalidates or refreshes the affected item detail/list queries.
+2. Confirm the mutation path also refreshes any translation settings/models queries it updates.
+3. Run `cd frontend && npx tsc -b --noEmit`.
+
+Expected Result: drawer consumers have a defined refetch/invalidation path after successful translation.
+Failure Indicators: no invalidation, stale item cache path, or disconnected query keys.
+
+Verification:
+
+1. USE TRANSLATE ITEM MUTATION (lines 250-280 in items.ts):
+   - onSuccess callback invalidates item detail query: queryKeys.items.detail(itemId)
+   - onSuccess callback invalidates item list queries: queryKeys.items.lists()
+   - onSuccess callback invalidates translation settings: queryKeys.translation.settings()
+   - onSuccess callback invalidates translation models: queryKeys.translation.models()
+
+2. USE UPDATE TRANSLATION SETTINGS MUTATION (lines 282-296 in items.ts):
+   - onSuccess callback invalidates translation settings query: queryKeys.translation.settings()
+
+3. QUERY KEYS STRUCTURE (keys.ts lines 44-48):
+   - translation.settings() returns [...queryKeys.translation.all, "settings"]
+   - translation.models() returns [...queryKeys.translation.all, "models"]
+   - All query keys follow established pattern
+
+4. API HELPERS (index.ts lines 35-71):
+   - translationAPI.getSettings() - GET /translation/settings
+   - translationAPI.updateSettings() - PATCH /translation/settings
+   - translationAPI.getModels() - GET /translation/models
+   - translationAPI.translateItem() - POST /translation/items/:id?force=true
+
+Evidence:
+- Query invalidation properly configured for all relevant cache paths
+- Translation mutations trigger refetch of affected item queries
+- All hooks compile without TypeScript errors

@@ -145,7 +145,6 @@ func (h *Handler) SetupRouter() *gin.Engine {
 			auth.POST("/translation/items/:id", h.translateItem)
 			auth.POST("/translation/items/batch", h.translateItemsBatch)
 
-
 			auth.GET("/search", h.search)
 
 			auth.GET("/bookmarks", h.listBookmarks)

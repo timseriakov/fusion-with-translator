@@ -1,0 +1,14 @@
+SCENARIO: query wiring compiles and invalidation hooks are connected
+Tool: Bash
+Preconditions: backend contract helpers already present
+Steps:
+1. Run `cd frontend && npx tsc -b --noEmit`.
+2. Run `cd frontend && pnpm run build`.
+Expected Result: compile/build succeed after query key and mutation wiring changes.
+Failure Indicators: TS errors for unknown translation fields, broken imports, or invalid mutation signatures.
+
+Evidence:
+- TypeScript compilation: PASSED (no errors)
+- Production build: PASSED (build completed successfully in 1.96s)
+- Translation query/mutation hooks properly typed
+- Cache invalidation hooks correctly connected to item detail and list queries

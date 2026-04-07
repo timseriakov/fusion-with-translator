@@ -201,7 +201,6 @@ export const ruMessages: PartialMessages = {
   "settings.translation.targetLanguage.description": "Язык для перевода статей",
   "settings.translation.autoMode.label": "Автоматический перевод",
   "settings.translation.autoMode.description": "Автоматически переводить статьи в списке и при открытии",
-    "Автоматически переводить новые статьи при их получении",
   "settings.translation.settingsUpdated": "Настройки успешно обновлены",
   "settings.translation.fetchFailed": "Не удалось загрузить модели",
   "settings.translation.updateFailed": "Не удалось обновить настройки",

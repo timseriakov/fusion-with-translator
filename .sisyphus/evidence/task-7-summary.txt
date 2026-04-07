@@ -1,0 +1,71 @@
+TASK 7: FRONTEND TRANSLATION DATA WIRING - SUMMARY
+====================================================
+
+ACCEPTANCE CRITERIA CHECKLIST:
+--------------------------------
+[✓] Settings queries/mutations and translate-item mutation are wired to final backend response shapes.
+[✓] Relevant item/settings queries invalidate or refresh after mutation success.
+[✓] TypeScript build passes with no unused/incorrect translation imports.
+[✓] `cd frontend && npx tsc -b --noEmit` passes.
+[✓] `cd frontend && pnpm run build` passes.
+
+IMPLEMENTATION DETAILS:
+-----------------------
+
+Files Modified:
+1. frontend/src/queries/items.ts (Lines 223-296)
+   - Added translationQueries object with settings and models queryOptions
+   - Added useTranslationSettings() hook
+   - Added useTranslationModels() hook
+   - Added useTranslateItem() mutation with cache invalidation
+   - Added useUpdateTranslationSettings() mutation
+
+2. frontend/src/queries/keys.ts (Lines 44-48)
+   - Added translation.key structure with settings() and models() methods
+
+3. frontend/src/lib/api/index.ts (Lines 35-71)
+   - Already had translationAPI with getSettings, updateSettings, getModels, translateItem
+
+4. frontend/src/lib/api/types.ts (Lines 193-221)
+   - Already had TranslationSettings, TranslationSettingsUpdateRequest, TranslationModelResponse, TranslateItemRequest, OpenAIModel types
+
+CACHE INVALIDATION STRATEGY:
+-----------------------------
+
+useTranslateItem Mutation (lines 250-280):
+- onSuccess: invalidates item detail query (queryKeys.items.detail(itemId))
+- onSuccess: invalidates item list queries (queryKeys.items.lists())
+- onSuccess: invalidates translation settings query (queryKeys.translation.settings())
+- onSuccess: invalidates translation models query (queryKeys.translation.models())
+
+useUpdateTranslationSettings Mutation (lines 282-296):
+- onSuccess: invalidates translation settings query only (queryKeys.translation.settings())
+
+VERIFICATION RESULTS:
+---------------------
+
+TypeScript Compilation:
+✓ No type errors
+✓ All imports used
+✓ Query keys properly structured
+
+Production Build:
+✓ Build completed successfully
+✓ Build time: 1.96s
+✓ No errors or warnings
+
+Evidence Captured:
+✓ .sisyphus/evidence/task-7-query-wiring.txt
+✓ .sisyphus/evidence/task-7-cache-refresh.txt
+
+NOTEPADS UPDATED:
+-----------------
+
+✓ .sisyphus/notepads/translation-feature/learnings.md
+✓ .sisyphus/notepads/translation-feature/issues.md
+✓ .sisyphus/notepads/translation-feature/problems.md
+✓ .sisyphus/notepads/translation-feature/decisions.md
+
+STATUS: COMPLETE
+================
+All acceptance criteria met. Task 7 is ready for Task 8 (Settings UI).

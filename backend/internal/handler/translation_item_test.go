@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"testing"
 	"sync"
-
+	"testing"
 
 	"github.com/0x2E/fusion/internal/config"
 	"github.com/0x2E/fusion/internal/store"
@@ -66,8 +65,6 @@ func (s *stubItemTranslator) Translate(ctx context.Context, apiKey, model, syste
 	s.responses = s.responses[1:]
 	return result.output, result.err
 }
-
-
 
 func newTranslationItemTestHandler(t *testing.T, cfg *config.Config) (*Handler, *store.Store) {
 	t.Helper()
@@ -482,5 +479,3 @@ func TestTranslateItemsBatch(t *testing.T) {
 		}
 	}
 }
-
-

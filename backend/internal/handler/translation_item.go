@@ -10,11 +10,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/0x2E/fusion/internal/model"
-
 
 	"github.com/0x2E/fusion/internal/config"
 	"github.com/0x2E/fusion/internal/pkg/httpc"
@@ -159,18 +158,18 @@ func (h *Handler) translateItem(c *gin.Context) {
 		return
 	}
 
-if err := h.doTranslateItem(c.Request.Context(), id, settings, apiKey, force); err != nil {
-if errors.Is(err, store.ErrNotFound) {
-notFoundError(c, "item")
-return
-}
-if errors.Is(err, errTranslationProducedNoOutput) || errors.Is(err, errTranslatedHTMLInvalid) {
-badRequestError(c, err.Error())
-return
-}
-internalError(c, err, "translate item")
-return
-}
+	if err := h.doTranslateItem(c.Request.Context(), id, settings, apiKey, force); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			notFoundError(c, "item")
+			return
+		}
+		if errors.Is(err, errTranslationProducedNoOutput) || errors.Is(err, errTranslatedHTMLInvalid) {
+			badRequestError(c, err.Error())
+			return
+		}
+		internalError(c, err, "translate item")
+		return
+	}
 
 	updatedItem, err := h.store.GetItem(id)
 	if err != nil {
@@ -288,8 +287,6 @@ func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model
 	return nil
 }
 
-
-
 func (h *Handler) translateItemsBatch(c *gin.Context) {
 	var req struct {
 		IDs []int64 `json:"ids"`
@@ -371,7 +368,6 @@ func (h *Handler) translateItemsBatch(c *gin.Context) {
 		"errors":     res.errors,
 	})
 }
-
 
 type htmlFragmentState int
 
