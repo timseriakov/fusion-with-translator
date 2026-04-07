@@ -11,6 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sync"
+
+	"github.com/0x2E/fusion/internal/model"
+
 
 	"github.com/0x2E/fusion/internal/config"
 	"github.com/0x2E/fusion/internal/pkg/httpc"
@@ -155,14 +159,34 @@ func (h *Handler) translateItem(c *gin.Context) {
 		return
 	}
 
+if err := h.doTranslateItem(c.Request.Context(), id, settings, apiKey, force); err != nil {
+if errors.Is(err, store.ErrNotFound) {
+notFoundError(c, "item")
+return
+}
+if errors.Is(err, errTranslationProducedNoOutput) || errors.Is(err, errTranslatedHTMLInvalid) {
+badRequestError(c, err.Error())
+return
+}
+internalError(c, err, "translate item")
+return
+}
+
+	updatedItem, err := h.store.GetItem(id)
+	if err != nil {
+		internalError(c, err, "get translated item")
+		return
+	}
+
+	dataResponse(c, updatedItem)
+}
+
+var errTranslationProducedNoOutput = errors.New("translation produced no output")
+
+func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model.TranslationSettings, apiKey string, force bool) error {
 	item, err := h.store.GetItem(id)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			notFoundError(c, "item")
-			return
-		}
-		internalError(c, err, "get item for translation")
-		return
+		return err
 	}
 
 	if !force {
@@ -171,8 +195,7 @@ func (h *Handler) translateItem(c *gin.Context) {
 			// Cache miss if content exists but was never translated (e.g. cached before plain-text fallback was added)
 			contentNeedsTranslation := itemContentIsTranslatable(item.Content)
 			if !contentNeedsTranslation || cache.TranslatedContent != nil {
-				dataResponse(c, item)
-				return
+				return nil
 			}
 		}
 	}
@@ -185,15 +208,14 @@ func (h *Handler) translateItem(c *gin.Context) {
 	var translatedTitle *string
 	if strings.TrimSpace(item.Title) != "" {
 		translated, err := translator.Translate(
-			c.Request.Context(),
+			ctx,
 			apiKey,
 			settings.TranslationModel,
 			fmt.Sprintf("Translate the following plain text to %s. Return only the translated text.", settings.TranslationTargetLanguage),
 			item.Title,
 		)
 		if err != nil {
-			internalError(c, fmt.Errorf("translate item title: %w", err), "translate item title")
-			return
+			return fmt.Errorf("translate item title: %w", err)
 		}
 		translated = strings.TrimSpace(translated)
 		if translated != "" {

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"sync"
+
 
 	"github.com/0x2E/fusion/internal/config"
 	"github.com/0x2E/fusion/internal/store"
@@ -30,6 +32,7 @@ type translateItemPayload struct {
 }
 
 type stubItemTranslator struct {
+	mu        sync.Mutex
 	responses []stubTranslationResult
 	calls     []stubTranslationCall
 }
