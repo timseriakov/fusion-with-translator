@@ -202,6 +202,7 @@ func (h *Handler) translateItem(c *gin.Context) {
 	}
 
 	var translatedContent *string
+	var translatedExcerpt *string
 	contentState := classifyHTMLFragment(item.Content)
 	if contentState == htmlFragmentValid {
 		translatedHTML, err := translateHTMLContent(
@@ -222,6 +223,10 @@ func (h *Handler) translateItem(c *gin.Context) {
 		}
 		if translatedHTML != "" {
 			translatedContent = &translatedHTML
+			excerpt := extractPlainTextExcerpt(translatedHTML, 300)
+			if excerpt != "" {
+				translatedExcerpt = &excerpt
+			}
 		}
 	} else if trimmedContent := strings.TrimSpace(item.Content); trimmedContent != "" && !strings.Contains(trimmedContent, "<") {
 		// Plain text content — translate directly without HTML parsing
@@ -239,10 +244,14 @@ func (h *Handler) translateItem(c *gin.Context) {
 		translated = strings.TrimSpace(translated)
 		if translated != "" {
 			translatedContent = &translated
+			excerpt := extractPlainTextExcerpt(translated, 300)
+			if excerpt != "" {
+				translatedExcerpt = &excerpt
+			}
 		}
 	}
 
-	if translatedTitle == nil && translatedContent == nil {
+	if translatedTitle == nil && translatedContent == nil && translatedExcerpt == nil {
 		badRequestError(c, "translation produced no output")
 		return
 	}
@@ -250,6 +259,7 @@ func (h *Handler) translateItem(c *gin.Context) {
 	if err := h.store.SaveItemTranslation(id, store.SaveItemTranslationInput{
 		TranslatedTitle:           translatedTitle,
 		TranslatedContent:         translatedContent,
+		TranslatedExcerpt:         translatedExcerpt,
 		TranslationModel:          settings.TranslationModel,
 		TranslationTargetLanguage: settings.TranslationTargetLanguage,
 		TranslationUpdatedAt:      time.Now().Unix(),
