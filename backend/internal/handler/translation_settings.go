@@ -13,6 +13,7 @@ type translationSettingsRequest struct {
 	OpenAIAPIKey              *string `json:"openai_api_key"`
 	TranslationModel          *string `json:"translation_model"`
 	TranslationTargetLanguage *string `json:"translation_target_language"`
+	AutoTranslateMode         *bool   `json:"auto_translate_mode"`
 }
 
 type translationSettingsResponse struct {
@@ -21,6 +22,7 @@ type translationSettingsResponse struct {
 	APIKeySource              string `json:"api_key_source,omitempty"`
 	TranslationModel          string `json:"translation_model"`
 	TranslationTargetLanguage string `json:"translation_target_language"`
+	AutoTranslateMode         bool   `json:"auto_translate_mode"`
 }
 
 func (h *Handler) getTranslationSettings(c *gin.Context) {
@@ -44,6 +46,7 @@ func (h *Handler) patchTranslationSettings(c *gin.Context) {
 		OpenAIAPIKey:              req.OpenAIAPIKey,
 		TranslationModel:          req.TranslationModel,
 		TranslationTargetLanguage: req.TranslationTargetLanguage,
+		AutoTranslateMode:         req.AutoTranslateMode,
 	})
 	if err != nil {
 		if errors.Is(err, store.ErrInvalid) {
@@ -66,6 +69,7 @@ func (h *Handler) buildTranslationSettingsResponse(settings *model.TranslationSe
 		APIKeySource:              source,
 		TranslationModel:          settings.TranslationModel,
 		TranslationTargetLanguage: settings.TranslationTargetLanguage,
+		AutoTranslateMode:         settings.AutoTranslateMode,
 	}
 }
 

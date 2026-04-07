@@ -21,6 +21,7 @@ type translationSettingsPayload struct {
 	APIKeySource              string `json:"api_key_source"`
 	TranslationModel          string `json:"translation_model"`
 	TranslationTargetLanguage string `json:"translation_target_language"`
+	AutoTranslateMode         bool   `json:"auto_translate_mode"`
 }
 
 func newTranslationSettingsTestHandler(t *testing.T, cfg *config.Config) (*Handler, *store.Store) {
@@ -128,6 +129,9 @@ func TestGetTranslationSettings(t *testing.T) {
 		if response.Data.TranslationTargetLanguage != language {
 			t.Fatalf("expected translation_target_language %q, got %q", language, response.Data.TranslationTargetLanguage)
 		}
+		if response.Data.AutoTranslateMode != false {
+			t.Fatal("expected auto_translate_mode to be false by default")
+		}
 		if strings.Contains(w.Body.String(), dbKey) {
 			t.Fatal("response body leaked db secret")
 		}
@@ -202,6 +206,9 @@ func TestPatchTranslationSettings(t *testing.T) {
 		if response.Data.TranslationTargetLanguage != "fr" {
 			t.Fatalf("expected translation_target_language fr, got %q", response.Data.TranslationTargetLanguage)
 		}
+		if response.Data.AutoTranslateMode != false {
+			t.Fatal("expected auto_translate_mode to be false")
+		}
 		if response.Data.APIKeySource != "db" {
 			t.Fatalf("expected api_key_source db, got %q", response.Data.APIKeySource)
 		}
@@ -274,7 +281,11 @@ func TestPatchTranslationSettings(t *testing.T) {
 			h.SetupRouter(),
 			http.MethodPatch,
 			"/api/translation/settings",
-			mustJSONBody(t, map[string]string{"openai_api_key": "sk-db-new", "translation_model": "gpt-4.1-mini"}),
+			mustJSONBody(t, map[string]any{
+				"openai_api_key":      "sk-db-new",
+				"translation_model":   "gpt-4.1-mini",
+				"auto_translate_mode": true,
+			}),
 			map[string]string{"Content-Type": "application/json"},
 		)
 		if w.Code != http.StatusOK {
@@ -294,6 +305,9 @@ func TestPatchTranslationSettings(t *testing.T) {
 		if response.Data.TranslationModel != "gpt-4.1-mini" {
 			t.Fatalf("expected translation_model gpt-4.1-mini, got %q", response.Data.TranslationModel)
 		}
+		if response.Data.AutoTranslateMode != true {
+			t.Fatal("expected auto_translate_mode to be true")
+		}
 
 		settings, err := st.GetTranslationSettings()
 		if err != nil {
@@ -304,6 +318,9 @@ func TestPatchTranslationSettings(t *testing.T) {
 		}
 		if settings.TranslationModel != "gpt-4.1-mini" {
 			t.Fatalf("expected stored translation model gpt-4.1-mini, got %q", settings.TranslationModel)
+		}
+		if settings.AutoTranslateMode != true {
+			t.Fatal("expected stored auto_translate_mode to be true")
 		}
 	})
 }
