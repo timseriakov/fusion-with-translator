@@ -199,6 +199,8 @@ export const svMessages: PartialMessages = {
   "settings.translation.model.manualPlaceholder": "Ange modell-ID manuellt...",
   "settings.translation.targetLanguage.label": "Målspråk",
   "settings.translation.targetLanguage.description": "Språk för artikelöversättning",
+  "settings.translation.autoMode.label": "Automatiskt översättningsläge",
+  "settings.translation.autoMode.description": "Översätt automatiskt artiklar i listan och vid öppning",
   "settings.translation.settingsUpdated": "Inställningar uppdaterades",
   "settings.translation.fetchFailed": "Det gick inte att hämta modeller",
   "settings.translation.updateFailed": "Det gick inte att uppdatera inställningar",

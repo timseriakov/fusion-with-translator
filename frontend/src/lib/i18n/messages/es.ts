@@ -199,6 +199,8 @@ export const esMessages: PartialMessages = {
   "settings.translation.model.manualPlaceholder": "Introducir ID del modelo manualmente...",
   "settings.translation.targetLanguage.label": "Idioma destino",
   "settings.translation.targetLanguage.description": "Idioma para la traducción de artículos",
+  "settings.translation.autoMode.label": "Modo de traducción automática",
+  "settings.translation.autoMode.description": "Traducir automáticamente los artículos de la lista y al abrirlos",
   "settings.translation.settingsUpdated": "Configuración actualizada correctamente",
   "settings.translation.fetchFailed": "Error al obtener los modelos",
   "settings.translation.updateFailed": "Error al actualizar la configuración",

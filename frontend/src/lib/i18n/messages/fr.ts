@@ -199,6 +199,8 @@ export const frMessages: PartialMessages = {
   "settings.translation.model.manualPlaceholder": "Saisir l'ID du modèle manuellement...",
   "settings.translation.targetLanguage.label": "Langue cible",
   "settings.translation.targetLanguage.description": "Langue pour la traduction des articles",
+  "settings.translation.autoMode.label": "Mode de traduction automatique",
+  "settings.translation.autoMode.description": "Traduire automatiquement les articles de la liste et a l'ouverture",
   "settings.translation.settingsUpdated": "Paramètres mis à jour avec succès",
   "settings.translation.fetchFailed": "Échec de la récupération des modèles",
   "settings.translation.updateFailed": "Échec de la mise à jour des paramètres",

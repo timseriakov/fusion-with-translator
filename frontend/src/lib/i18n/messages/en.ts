@@ -198,6 +198,8 @@ export const enMessages = {
   "settings.translation.model.manualPlaceholder": "Enter model ID manually...",
   "settings.translation.targetLanguage.label": "Target Language",
   "settings.translation.targetLanguage.description": "Language for article translation",
+  "settings.translation.autoMode.label": "Auto-translate mode",
+  "settings.translation.autoMode.description": "Automatically translate articles in the list and on open",
   "settings.translation.settingsUpdated": "Settings updated successfully",
   "settings.translation.fetchFailed": "Failed to fetch models",
   "settings.translation.updateFailed": "Failed to update settings",

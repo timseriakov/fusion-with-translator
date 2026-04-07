@@ -199,6 +199,8 @@ export const deMessages: PartialMessages = {
   "settings.translation.model.manualPlaceholder": "Modell-ID manuell eingeben...",
   "settings.translation.targetLanguage.label": "Zielsprache",
   "settings.translation.targetLanguage.description": "Sprache für die Artikelübersetzung",
+  "settings.translation.autoMode.label": "Auto-translate mode",
+  "settings.translation.autoMode.description": "Automatically translate articles in the list and on open",
   "settings.translation.settingsUpdated": "Einstellungen erfolgreich aktualisiert",
   "settings.translation.fetchFailed": "Modelle konnten nicht abgerufen werden",
   "settings.translation.updateFailed": "Einstellungen konnten nicht aktualisiert werden",
