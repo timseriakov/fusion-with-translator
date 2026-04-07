@@ -329,3 +329,76 @@ func TestTranslateItem(t *testing.T) {
 		}
 	})
 }
+
+func TestExtractPlainTextExcerpt(t *testing.T) {
+	tests := []struct {
+		name     string
+		html     string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "empty content",
+			html:     "",
+			maxLen:   10,
+			expected: "",
+		},
+		{
+			name:     "no tags",
+			html:     "hello world",
+			maxLen:   20,
+			expected: "hello world",
+		},
+		{
+			name:     "simple tags",
+			html:     "<p>hello</p> <strong>world</strong>",
+			maxLen:   20,
+			expected: "hello world",
+		},
+		{
+			name:     "nested tags",
+			html:     "<div><p>hello <span>world</span></p></div>",
+			maxLen:   20,
+			expected: "hello world",
+		},
+		{
+			name:     "whitespace collapsing",
+			html:     "  hello \n\t world  ",
+			maxLen:   20,
+			expected: "hello world",
+		},
+		{
+			name:     "truncation at rune boundary",
+			html:     "hello world",
+			maxLen:   5,
+			expected: "hello",
+		},
+		{
+			name:     "multi-byte runes truncation",
+			html:     "Привет мир", // "Привет" is 6 runes
+			maxLen:   6,
+			expected: "Привет",
+		},
+		{
+			name:     "html entities decoding",
+			html:     "hello &amp; world",
+			maxLen:   20,
+			expected: "hello & world",
+		},
+		{
+			name:     "script and style tags (should be stripped)",
+			html:     "<script>alert(1)</script>hello<style>body{}</style>",
+			maxLen:   20,
+			expected: "hello",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := extractPlainTextExcerpt(tt.html, tt.maxLen)
+			if actual != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, actual)
+			}
+		})
+	}
+}

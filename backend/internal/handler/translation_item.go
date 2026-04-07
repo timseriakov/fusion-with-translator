@@ -603,3 +603,48 @@ func itemContentIsTranslatable(content string) bool {
 	}
 	return true // plain text
 }
+// extractPlainTextExcerpt strips HTML tags and returns a plain text excerpt of maxLen runes.
+// It skips content inside <script> and <style> tags.
+func extractPlainTextExcerpt(htmlContent string, maxLen int) string {
+	if htmlContent == "" || maxLen <= 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	z := html.NewTokenizer(strings.NewReader(htmlContent))
+	skip := 0
+
+loop:
+	for {
+		tt := z.Next()
+		switch tt {
+		case html.ErrorToken:
+			break loop
+		case html.StartTagToken:
+			name, _ := z.TagName()
+			tag := strings.ToLower(string(name))
+			if tag == "script" || tag == "style" {
+				skip++
+			}
+		case html.EndTagToken:
+			name, _ := z.TagName()
+			tag := strings.ToLower(string(name))
+			if tag == "script" || tag == "style" {
+				skip--
+			}
+		case html.TextToken:
+			if skip <= 0 {
+				buf.Write(z.Text())
+			}
+		}
+	}
+
+	// Collapse whitespace and trim. html.NewTokenizer.Text() returns raw text, so we unescape it.
+	plainText := html.UnescapeString(strings.Join(strings.Fields(buf.String()), " "))
+	runes := []rune(plainText)
+	if len(runes) <= maxLen {
+		return plainText
+	}
+	return string(runes[:maxLen])
+}
+
