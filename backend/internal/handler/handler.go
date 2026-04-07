@@ -143,6 +143,8 @@ func (h *Handler) SetupRouter() *gin.Engine {
 			auth.PATCH("/translation/settings", h.patchTranslationSettings)
 			auth.GET("/translation/models", h.getTranslationModels)
 			auth.POST("/translation/items/:id", h.translateItem)
+			auth.POST("/translation/items/batch", h.translateItemsBatch)
+
 
 			auth.GET("/search", h.search)
 

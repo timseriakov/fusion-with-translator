@@ -50,7 +50,9 @@ type stubTranslationCall struct {
 }
 
 func (s *stubItemTranslator) Translate(ctx context.Context, apiKey, model, systemPrompt, userPrompt string) (string, error) {
-	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.calls = append(s.calls, stubTranslationCall{
 		apiKey:       apiKey,
 		model:        model,
@@ -64,6 +66,8 @@ func (s *stubItemTranslator) Translate(ctx context.Context, apiKey, model, syste
 	s.responses = s.responses[1:]
 	return result.output, result.err
 }
+
+
 
 func newTranslationItemTestHandler(t *testing.T, cfg *config.Config) (*Handler, *store.Store) {
 	t.Helper()
@@ -84,14 +88,16 @@ func decodeTranslateItemResponse(t *testing.T, body []byte) translateItemEnvelop
 func seedTranslationItemFixture(t *testing.T, st *store.Store, title string, content string) int64 {
 	t.Helper()
 
-	group, err := st.CreateGroup("Translation Group")
+	group, err := st.CreateGroup(fmt.Sprintf("Translation Group %s", title))
 	if err != nil {
 		t.Fatalf("create group: %v", err)
 	}
-	feed, err := st.CreateFeed(group.ID, "Translation Feed", "https://example.com/feed.xml", "https://example.com", "")
+
+	feed, err := st.CreateFeed(group.ID, fmt.Sprintf("Translation Feed %s", title), fmt.Sprintf("https://example.com/feed-%s.xml", title), "https://example.com", "")
 	if err != nil {
 		t.Fatalf("create feed: %v", err)
 	}
+
 	item, err := st.CreateItem(feed.ID, fmt.Sprintf("guid-%s", title), title, "https://example.com/item", content, 1700000000)
 	if err != nil {
 		t.Fatalf("create item: %v", err)
@@ -419,3 +425,62 @@ func TestExtractPlainTextExcerpt(t *testing.T) {
 		})
 	}
 }
+
+func TestTranslateItemsBatch(t *testing.T) {
+	h, st := newTranslationItemTestHandler(t, &config.Config{})
+	mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
+
+	id1 := seedTranslationItemFixture(t, st, "Title 1", "Content 1")
+	id2 := seedTranslationItemFixture(t, st, "Title 2", "Content 2")
+	id3 := seedTranslationItemFixture(t, st, "Title 3", "Content 3")
+
+	translator := &stubItemTranslator{
+		responses: []stubTranslationResult{
+			{output: "Translated Title 1"},
+			{output: "Translated Content 1"},
+			{output: "Translated Title 2"},
+			{output: "Translated Content 2"},
+			{output: "Translated Title 3"},
+			{err: errors.New("translation failed")},
+		},
+	}
+	h.itemTranslator = translator
+
+	body := map[string]any{
+		"ids": []int64{id1, id2, id3},
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	w := performRequest(h.SetupRouter(), http.MethodPost, "/api/translation/items/batch", strings.NewReader(string(jsonBody)), nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data struct {
+			Translated []int64           `json:"translated"`
+			Failed     []int64           `json:"failed"`
+			Errors     map[string]string `json:"errors"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(resp.Data.Translated) != 2 {
+		t.Errorf("expected 2 translated items, got %d", len(resp.Data.Translated))
+	}
+	if len(resp.Data.Failed) != 1 {
+		t.Errorf("expected 1 failed item, got %d", len(resp.Data.Failed))
+	}
+	if len(resp.Data.Errors) != 1 {
+		t.Errorf("expected 1 error, got %d", len(resp.Data.Errors))
+	}
+	for idStr, errMsg := range resp.Data.Errors {
+		if !strings.Contains(errMsg, "translation failed") {
+			t.Errorf("expected error message for item %s to contain 'translation failed', got %q", idStr, errMsg)
+		}
+	}
+}
+
+

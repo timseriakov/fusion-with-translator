@@ -228,7 +228,7 @@ func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model
 	contentState := classifyHTMLFragment(item.Content)
 	if contentState == htmlFragmentValid {
 		translatedHTML, err := translateHTMLContent(
-			c.Request.Context(),
+			ctx,
 			translator,
 			apiKey,
 			settings.TranslationModel,
@@ -236,12 +236,7 @@ func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model
 			item.Content,
 		)
 		if err != nil {
-			if errors.Is(err, errTranslatedHTMLInvalid) {
-				badRequestError(c, "translated content failed validation")
-				return
-			}
-			internalError(c, fmt.Errorf("translate item content: %w", err), "translate item content")
-			return
+			return err
 		}
 		if translatedHTML != "" {
 			translatedContent = &translatedHTML
@@ -253,15 +248,14 @@ func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model
 	} else if trimmedContent := strings.TrimSpace(item.Content); trimmedContent != "" && !strings.Contains(trimmedContent, "<") {
 		// Plain text content — translate directly without HTML parsing
 		translated, err := translator.Translate(
-			c.Request.Context(),
+			ctx,
 			apiKey,
 			settings.TranslationModel,
 			fmt.Sprintf("Translate the following plain text to %s. Return only the translated text.", settings.TranslationTargetLanguage),
 			trimmedContent,
 		)
 		if err != nil {
-			internalError(c, fmt.Errorf("translate item content: %w", err), "translate item content")
-			return
+			return fmt.Errorf("translate item content: %w", err)
 		}
 		translated = strings.TrimSpace(translated)
 		if translated != "" {
@@ -274,8 +268,7 @@ func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model
 	}
 
 	if translatedTitle == nil && translatedContent == nil && translatedExcerpt == nil {
-		badRequestError(c, "translation produced no output")
-		return
+		return errTranslationProducedNoOutput
 	}
 
 	if err := h.store.SaveItemTranslation(id, store.SaveItemTranslationInput{
@@ -286,26 +279,99 @@ func (h *Handler) doTranslateItem(ctx context.Context, id int64, settings *model
 		TranslationTargetLanguage: settings.TranslationTargetLanguage,
 		TranslationUpdatedAt:      time.Now().Unix(),
 	}); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			notFoundError(c, "item")
-			return
-		}
 		if errors.Is(err, store.ErrInvalid) {
-			badRequestError(c, "translation produced no output")
-			return
+			return errTranslationProducedNoOutput
 		}
-		internalError(c, err, "save item translation")
-		return
+		return err
 	}
 
-	updatedItem, err := h.store.GetItem(id)
-	if err != nil {
-		internalError(c, err, "get translated item")
-		return
-	}
-
-	dataResponse(c, updatedItem)
+	return nil
 }
+
+
+
+func (h *Handler) translateItemsBatch(c *gin.Context) {
+	var req struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		badRequestError(c, "invalid request body")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		badRequestError(c, "no ids provided")
+		return
+	}
+	if len(req.IDs) > 20 {
+		badRequestError(c, "batch size exceeds limit of 20")
+		return
+	}
+
+	settings, err := h.store.GetTranslationSettings()
+	if err != nil {
+		internalError(c, err, "get translation settings for batch")
+		return
+	}
+
+	apiKey, _ := h.resolveTranslationAPIKey(settings.OpenAIAPIKey)
+	if apiKey == "" {
+		badRequestError(c, "no API key configured")
+		return
+	}
+	if strings.TrimSpace(settings.TranslationModel) == "" {
+		badRequestError(c, "no translation model configured")
+		return
+	}
+	if strings.TrimSpace(settings.TranslationTargetLanguage) == "" {
+		badRequestError(c, "no target language configured")
+		return
+	}
+
+	type result struct {
+		translated []int64
+		failed     []int64
+		errors     map[string]string
+	}
+	res := result{
+		translated: make([]int64, 0),
+		failed:     make([]int64, 0),
+		errors:     make(map[string]string),
+	}
+	var mu sync.Mutex
+
+	sem := make(chan struct{}, 5)
+	var wg sync.WaitGroup
+
+	for _, id := range req.IDs {
+		wg.Add(1)
+		go func(id int64) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			err := h.doTranslateItem(c.Request.Context(), id, settings, apiKey, false)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				res.failed = append(res.failed, id)
+				res.errors[strconv.FormatInt(id, 10)] = err.Error()
+			} else {
+				res.translated = append(res.translated, id)
+			}
+		}(id)
+	}
+
+	wg.Wait()
+
+	dataResponse(c, gin.H{
+		"translated": res.translated,
+		"failed":     res.failed,
+		"errors":     res.errors,
+	})
+}
+
 
 type htmlFragmentState int
 
