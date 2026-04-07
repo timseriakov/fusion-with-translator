@@ -26,7 +26,7 @@ type ListItemsParams struct {
 func (s *Store) ListItems(params ListItemsParams) ([]*model.Item, error) {
 	query := `
 		SELECT items.id, items.feed_id, items.guid, items.title, items.link, items.content, items.pub_date, items.unread, items.created_at,
-			items.translated_title, items.translated_content, COALESCE(items.translation_model, ''), COALESCE(items.translation_target_language, ''), COALESCE(items.translation_updated_at, 0)
+			items.translated_title, items.translated_content, items.translated_excerpt, COALESCE(items.translation_model, ''), COALESCE(items.translation_target_language, ''), COALESCE(items.translation_updated_at, 0)
 		FROM items
 	`
 	args := []any{}
@@ -89,6 +89,7 @@ func (s *Store) ListItems(params ListItemsParams) ([]*model.Item, error) {
 			&i.CreatedAt,
 			&i.TranslatedTitle,
 			&i.TranslatedContent,
+			&i.TranslatedExcerpt,
 			&i.TranslationModel,
 			&i.TranslationTargetLanguage,
 			&i.TranslationUpdatedAt,
@@ -105,7 +106,7 @@ func (s *Store) GetItem(id int64) (*model.Item, error) {
 	i := &model.Item{}
 	var unread int
 	err := s.db.QueryRow(`
-		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at, translated_title, translated_content, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
+		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at, translated_title, translated_content, translated_excerpt, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
 		FROM items
 		WHERE id = :id
 	`, sql.Named("id", id)).Scan(
@@ -120,6 +121,7 @@ func (s *Store) GetItem(id int64) (*model.Item, error) {
 		&i.CreatedAt,
 		&i.TranslatedTitle,
 		&i.TranslatedContent,
+		&i.TranslatedExcerpt,
 		&i.TranslationModel,
 		&i.TranslationTargetLanguage,
 		&i.TranslationUpdatedAt,
@@ -359,7 +361,7 @@ type ListFeverItemsParams struct {
 
 func (s *Store) ListFeverItems(params ListFeverItemsParams) ([]*model.Item, error) {
 	query := `
-		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at, translated_title, translated_content, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
+		SELECT id, feed_id, guid, title, link, content, pub_date, unread, created_at, translated_title, translated_content, translated_excerpt, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
 		FROM items
 		WHERE 1=1
 	`
@@ -418,6 +420,7 @@ func (s *Store) ListFeverItems(params ListFeverItemsParams) ([]*model.Item, erro
 			&i.CreatedAt,
 			&i.TranslatedTitle,
 			&i.TranslatedContent,
+			&i.TranslatedExcerpt,
 			&i.TranslationModel,
 			&i.TranslationTargetLanguage,
 			&i.TranslationUpdatedAt,
@@ -551,11 +554,13 @@ type UpdateTranslationSettingsParams struct {
 	OpenAIAPIKey              *string
 	TranslationModel          *string
 	TranslationTargetLanguage *string
+	AutoTranslateMode         *bool
 }
 
 type SaveItemTranslationInput struct {
 	TranslatedTitle           *string
 	TranslatedContent         *string
+	TranslatedExcerpt         *string
 	TranslationModel          string
 	TranslationTargetLanguage string
 	TranslationUpdatedAt      int64
@@ -563,15 +568,18 @@ type SaveItemTranslationInput struct {
 
 func (s *Store) GetTranslationSettings() (*model.TranslationSettings, error) {
 	settings := &model.TranslationSettings{}
+	var autoTranslateMode int
 	err := s.db.QueryRow(`
-		SELECT openai_api_key, translation_model, translation_target_language
+		SELECT openai_api_key, translation_model, translation_target_language, auto_translate_mode
 		FROM ai_translation_settings
 		WHERE id = 1
 	`).Scan(
 		&settings.OpenAIAPIKey,
 		&settings.TranslationModel,
 		&settings.TranslationTargetLanguage,
+		&autoTranslateMode,
 	)
+	settings.AutoTranslateMode = intToBool(autoTranslateMode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &model.TranslationSettings{}, nil
@@ -620,19 +628,30 @@ func (s *Store) UpdateTranslationSettings(params UpdateTranslationSettingsParams
 		}
 	}
 
+	if params.AutoTranslateMode != nil {
+		if _, err := s.db.Exec(`
+			UPDATE ai_translation_settings
+			SET auto_translate_mode = :auto_translate_mode
+			WHERE id = 1
+		`, sql.Named("auto_translate_mode", boolToInt(*params.AutoTranslateMode))); err != nil {
+			return nil, fmt.Errorf("update auto translate mode: %w", err)
+		}
+	}
+
 	return s.GetTranslationSettings()
 }
 
 func (s *Store) GetItemTranslationCache(id int64) (*model.ItemTranslationCache, error) {
 	cache := &model.ItemTranslationCache{}
 	err := s.db.QueryRow(`
-		SELECT id, translated_title, translated_content, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
+		SELECT id, translated_title, translated_content, translated_excerpt, COALESCE(translation_model, ''), COALESCE(translation_target_language, ''), COALESCE(translation_updated_at, 0)
 		FROM items
 		WHERE id = :id
 	`, sql.Named("id", id)).Scan(
 		&cache.ItemID,
 		&cache.TranslatedTitle,
 		&cache.TranslatedContent,
+		&cache.TranslatedExcerpt,
 		&cache.TranslationModel,
 		&cache.TranslationTargetLanguage,
 		&cache.TranslationUpdatedAt,
@@ -648,14 +667,15 @@ func (s *Store) GetItemTranslationCache(id int64) (*model.ItemTranslationCache, 
 }
 
 func (s *Store) SaveItemTranslation(id int64, input SaveItemTranslationInput) error {
-	if input.TranslatedTitle == nil && input.TranslatedContent == nil {
-		return fmt.Errorf("%w: translation requires title or content", ErrInvalid)
+	if input.TranslatedTitle == nil && input.TranslatedContent == nil && input.TranslatedExcerpt == nil {
+		return fmt.Errorf("%w: translation requires title, content or excerpt", ErrInvalid)
 	}
 
 	result, err := s.db.Exec(`
 		UPDATE items
 		SET translated_title = :translated_title,
 			translated_content = :translated_content,
+			translated_excerpt = :translated_excerpt,
 			translation_model = :translation_model,
 			translation_target_language = :translation_target_language,
 			translation_updated_at = :translation_updated_at
@@ -663,6 +683,7 @@ func (s *Store) SaveItemTranslation(id int64, input SaveItemTranslationInput) er
 	`,
 		sql.Named("translated_title", input.TranslatedTitle),
 		sql.Named("translated_content", input.TranslatedContent),
+		sql.Named("translated_excerpt", input.TranslatedExcerpt),
 		sql.Named("translation_model", input.TranslationModel),
 		sql.Named("translation_target_language", input.TranslationTargetLanguage),
 		sql.Named("translation_updated_at", input.TranslationUpdatedAt),
