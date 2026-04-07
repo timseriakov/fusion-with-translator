@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useTranslationSettings, useTranslationModels, useUpdateTranslationSettings } from "@/queries/items";
 import { useI18n } from "@/lib/i18n";
 
@@ -33,6 +34,7 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
   // Separate state for model and target language
   const [translationModel, setTranslationModel] = useState("");
   const [translationTargetLanguage, setTranslationTargetLanguage] = useState("ru");
+  const [autoTranslateMode, setAutoTranslateMode] = useState(false);
   const [openaiAPIKey, setOpenaiAPIKey] = useState("");
 
   // Fetch current settings
@@ -52,7 +54,7 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
   const updateSettings = useUpdateTranslationSettings();
 
   const handleUpdateSettings = () => {
-    const updatePayload: { translation_model?: string; translation_target_language?: string; openai_api_key?: string } = {};
+    const updatePayload: { translation_model?: string; translation_target_language?: string; openai_api_key?: string; auto_translate_mode?: boolean } = {};
 
     if (translationTargetLanguage !== settings?.translation_target_language) {
       updatePayload.translation_target_language = translationTargetLanguage;
@@ -66,11 +68,16 @@ export function TranslationSettingsContent({ onOpenTranslationHelp }: Translatio
       updatePayload.openai_api_key = openaiAPIKey.trim();
     }
 
-if (Object.keys(updatePayload).length === 0) {
-// No changes to save
-toast.info(t("settings.translation.noChanges"));
-return;
-}
+    if (autoTranslateMode !== settings?.auto_translate_mode) {
+      updatePayload.auto_translate_mode = autoTranslateMode;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      // No changes to save
+      toast.info(t("settings.translation.noChanges"));
+      return;
+    }
+
     updateSettings.mutate(updatePayload as any, {
       onSuccess: () => {
         toast.success(t("settings.translation.settingsUpdated"));
@@ -121,6 +128,7 @@ return;
     if (settings) {
       setTranslationTargetLanguage(settings.translation_target_language || "ru");
       setTranslationModel(settings.translation_model || "");
+      setAutoTranslateMode(settings.auto_translate_mode || false);
     }
   }, [settings]);
 
@@ -278,6 +286,21 @@ return;
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Auto-translate Mode Section */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">{t("settings.translation.autoMode.label")}</p>
+          <p className="text-[13px] text-muted-foreground">
+            {t("settings.translation.autoMode.description")}
+          </p>
+        </div>
+        <Switch
+          checked={autoTranslateMode}
+          onCheckedChange={setAutoTranslateMode}
+          disabled={updateSettings.isPending || !settings?.has_api_key}
+        />
       </div>
 
       {/* Update Button */}

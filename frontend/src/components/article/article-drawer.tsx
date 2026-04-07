@@ -167,11 +167,6 @@ export function ArticleDrawer() {
   const translateItem = useTranslateItem();
   const { data: translationSettings } = useTranslationSettings();
 
-  // Reset showTranslated when article changes
-  useEffect(() => {
-    setShowTranslated(false);
-  }, [selectedArticleId]);
-
   const hasTranslation = Boolean(article?.translated_title || article?.translated_content);
   const isTranslationEnabled = Boolean(translationSettings?.has_api_key);
 
@@ -184,6 +179,23 @@ export function ArticleDrawer() {
       console.error("Failed to translate article:", error);
     }
   };
+
+  // Auto-translate and reset logic
+  useEffect(() => {
+    const autoTranslateMode = translationSettings?.auto_translate_mode ?? false;
+    if (autoTranslateMode) {
+      if (!hasTranslation && article && !translateItem.isPending) {
+        void handleTranslate(false);
+      }
+      setShowTranslated(hasTranslation);
+    }
+  }, [selectedArticleId, translationSettings?.auto_translate_mode, article?.id, hasTranslation]);
+
+  useEffect(() => {
+    if (!translationSettings?.auto_translate_mode) {
+      setShowTranslated(false);
+    }
+  }, [selectedArticleId, translationSettings?.auto_translate_mode]);
 
   return (
     <Sheet open={selectedArticleId !== null} onOpenChange={handleOpenChange}>

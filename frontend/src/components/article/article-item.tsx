@@ -1,4 +1,4 @@
-import { Circle, CircleCheck, Star, ExternalLink } from "lucide-react";
+import { Circle, CircleCheck, Star, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatDate, extractSummary } from "@/lib/utils";
@@ -16,6 +16,8 @@ interface ArticleItemProps {
   isStarred: boolean;
   feedName: string;
   feedFaviconUrl: string | null;
+  autoTranslateMode?: boolean;
+  isTranslating?: boolean;
 }
 
 export function ArticleItem({
@@ -28,11 +30,15 @@ export function ArticleItem({
   isStarred,
   feedName,
   feedFaviconUrl,
+  autoTranslateMode,
+  isTranslating,
 }: ArticleItemProps) {
   const { t } = useI18n();
 
   const isSelected = selectedArticleId === article.id;
   const safeArticleLink = toSafeExternalUrl(article.link);
+  const displayTitle = (autoTranslateMode && article.translated_title) || article.title;
+  const displayExcerpt = (autoTranslateMode && article.translated_excerpt) || extractSummary(article.content, 150);
 
   const handleToggleRead = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,10 +84,10 @@ export function ArticleItem({
             article.unread ? "text-foreground" : "text-muted-foreground",
           )}
         >
-          {article.title}
+          {displayTitle}
         </h3>
         <p className="line-clamp-2 text-sm text-muted-foreground">
-          {extractSummary(article.content, 150)}
+          {displayExcerpt}
         </p>
         <div className="flex items-center gap-2 text-xs">
           <FeedFavicon src={feedFaviconUrl} className="h-3.5 w-3.5 rounded-sm" />
@@ -92,6 +98,9 @@ export function ArticleItem({
           <span className="shrink-0 text-muted-foreground">
             {formatDate(article.pub_date)}
           </span>
+          {isTranslating && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
         </div>
       </div>
 

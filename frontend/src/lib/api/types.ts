@@ -37,21 +37,22 @@ export interface FeedFetchState {
 }
 
 export interface Item {
-id: number;
-feed_id: number;
-guid: string;
-title: string;
-link: string;
-content: string;
-pub_date: number;
-unread: boolean;
-created_at: number;
-// Translation fields
-translated_title?: string | null;
-translated_content?: string | null;
-translation_model?: string | null;
-translation_target_language?: string | null;
-translation_updated_at?: number | null;
+  id: number;
+  feed_id: number;
+  guid: string;
+  title: string;
+  link: string;
+  content: string;
+  pub_date: number;
+  unread: boolean;
+  created_at: number;
+  // Translation fields
+  translated_title?: string | null;
+  translated_content?: string | null;
+  translation_model?: string | null;
+  translation_target_language?: string | null;
+  translation_updated_at?: number | null;
+  translated_excerpt?: string | null;
 }
 
 export interface Bookmark {
@@ -197,12 +198,14 @@ export interface TranslationSettings {
   api_key_source: "env" | "db";
   translation_model: string;
   translation_target_language: string;
+  auto_translate_mode: boolean;
 }
 
 export interface TranslationSettingsUpdateRequest {
   openai_api_key?: string;
   translation_model?: string;
   translation_target_language?: string;
+  auto_translate_mode?: boolean;
 }
 
 export interface OpenAIModel {
@@ -218,4 +221,13 @@ export interface TranslationModelResponse {
 
 export interface TranslateItemRequest {
   force?: boolean;
+}
+
+export interface BatchTranslateRequest {
+  ids: number[];
+}
+export interface BatchTranslateResult {
+  translated: number[];
+  failed: number[];
+  errors: Record<string, string>;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCheck, Loader2 } from "lucide-react";
@@ -15,6 +15,8 @@ import {
   useItems,
   useMarkItemsRead,
   useMarkItemsUnread,
+  useTranslationSettings,
+  useBatchTranslateItems,
 } from "@/queries/items";
 import { useFeedLookup } from "@/queries/feeds";
 import { useGroups } from "@/queries/groups";
@@ -40,6 +42,14 @@ export function ArticleList() {
     selectedArticleId,
     setSelectedArticle,
   } = useUrlState();
+  const { data: translationSettings } = useTranslationSettings();
+  const batchTranslate = useBatchTranslateItems();
+  const [translatingIds, setTranslatingIds] = useState<Set<number>>(new Set());
+
+  const autoTranslateMode = translationSettings?.auto_translate_mode ?? false;
+  const hasApiKey = translationSettings?.has_api_key ?? false;
+
+
   const queryClient = useQueryClient();
   const [starredUnreadOverrides, setStarredUnreadOverrides] = useState<
     Record<number, boolean>
@@ -101,6 +111,35 @@ export function ArticleList() {
       })),
     [articles, getArticleUnread],
   );
+  useEffect(() => {
+    if (!autoTranslateMode || !hasApiKey || articles.length === 0 || translatingIds.size > 0) return;
+
+    const untranslatedIds = displayArticles
+      .filter(
+        (a) =>
+          a.id > 0 &&
+          !a.translated_title &&
+          !a.translated_excerpt &&
+          !translatingIds.has(a.id)
+      )
+      .map((a) => a.id);
+
+    if (untranslatedIds.length === 0) return;
+
+    const toTranslate = untranslatedIds.slice(0, 10);
+    setTranslatingIds(new Set(toTranslate));
+
+    batchTranslate.mutateAsync(toTranslate).finally(() => {
+      setTranslatingIds(new Set());
+    });
+  }, [
+    autoTranslateMode,
+    hasApiKey,
+    displayArticles,
+    translatingIds.size,
+    batchTranslate,
+    articles.length,
+  ]);
 
   const hasMore = isStarredMode ? false : itemsQuery.hasNextPage;
   const isLoading = isStarredMode ? false : itemsQuery.isLoading;
@@ -327,6 +366,8 @@ export function ArticleList() {
                       feedFaviconUrl={
                         feed ? getFaviconUrl(feed.link, feed.site_url) : null
                       }
+                      autoTranslateMode={autoTranslateMode}
+                      isTranslating={translatingIds.has(article.id)}
                     />
                   );
                 })}

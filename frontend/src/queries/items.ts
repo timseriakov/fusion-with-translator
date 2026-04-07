@@ -278,6 +278,27 @@ export function useTranslateItem() {
     },
   });
 }
+export function useBatchTranslateItems() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      return translationAPI.batchTranslate(ids);
+    },
+    onSuccess: () => {
+      // Invalidate all item lists to refresh with new translations
+      qc.invalidateQueries({
+        queryKey: queryKeys.items.lists(),
+      });
+      // Also invalidate any individual item details that might be open
+      qc.invalidateQueries({
+        queryKey: queryKeys.items.details(),
+      });
+    },
+  });
+}
+
+
 
 export function useUpdateTranslationSettings() {
   const qc = useQueryClient();

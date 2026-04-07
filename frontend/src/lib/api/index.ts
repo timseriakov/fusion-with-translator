@@ -22,6 +22,11 @@ import type {
   SearchResponse,
   OIDCStatusResponse,
   OIDCLoginResponse,
+  TranslationSettings,
+  TranslationSettingsUpdateRequest,
+  TranslationModelResponse,
+  TranslateItemRequest,
+  BatchTranslateResult,
 } from "./types";
 
 // Session APIs
@@ -31,13 +36,6 @@ export const sessionAPI = {
 
   logout: () => api.delete<void>("/sessions"),
 };
-// Translation API types
-import type {
-  TranslationSettings,
-  TranslationSettingsUpdateRequest,
-  TranslationModelResponse,
-  TranslateItemRequest,
-} from "./types";
 
 // Translation APIs
 export const translationAPI = {
@@ -68,6 +66,9 @@ export const translationAPI = {
       `/translation/items/${itemId}${queryString ? `?${queryString}` : ""}`,
     );
   },
+
+  batchTranslate: (ids: number[]) =>
+    api.post<APIResponse<BatchTranslateResult>>("/translation/items/batch", { ids }),
 };
 
 // OIDC APIs
