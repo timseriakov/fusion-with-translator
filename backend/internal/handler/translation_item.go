@@ -613,6 +613,7 @@ func itemContentIsTranslatable(content string) bool {
 	}
 	return true // plain text
 }
+
 // extractPlainTextExcerpt strips HTML tags and returns a plain text excerpt of maxLen runes.
 // It skips content inside <script> and <style> tags.
 func extractPlainTextExcerpt(htmlContent string, maxLen int) string {
@@ -657,4 +658,3 @@ loop:
 	}
 	return string(runes[:maxLen])
 }
-
