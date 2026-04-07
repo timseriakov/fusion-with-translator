@@ -69,6 +69,7 @@ type Item struct {
 
 	TranslatedTitle           *string `json:"translated_title,omitempty"`
 	TranslatedContent         *string `json:"translated_content,omitempty"`
+	TranslatedExcerpt         *string `json:"translated_excerpt,omitempty"`
 	TranslationModel          string  `json:"translation_model"`
 	TranslationTargetLanguage string  `json:"translation_target_language"`
 	TranslationUpdatedAt      int64   `json:"translation_updated_at"`
@@ -79,6 +80,7 @@ type TranslationSettings struct {
 	OpenAIAPIKey              string `json:"openai_api_key"`
 	TranslationModel          string `json:"translation_model"`
 	TranslationTargetLanguage string `json:"translation_target_language"`
+	AutoTranslateMode         bool   `json:"auto_translate_mode"`
 }
 
 // ItemTranslationCache stores cached translation fields for an item.
@@ -86,6 +88,7 @@ type ItemTranslationCache struct {
 	ItemID                    int64   `json:"item_id"`
 	TranslatedTitle           *string `json:"translated_title,omitempty"`
 	TranslatedContent         *string `json:"translated_content,omitempty"`
+	TranslatedExcerpt         *string `json:"translated_excerpt,omitempty"`
 	TranslationModel          string  `json:"translation_model"`
 	TranslationTargetLanguage string  `json:"translation_target_language"`
 	TranslationUpdatedAt      int64   `json:"translation_updated_at"`
