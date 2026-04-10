@@ -17,6 +17,16 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
+// goMigrations defines code-only migrations that run after SQL migrations.
+// Used when a migration requires Go logic (e.g., data transformation).
+var goMigrations = []struct {
+	version int
+	name    string
+	migrate func(db *sql.DB) error
+}{
+	{version: 6, name: "convert_html_to_markdown", migrate: convertHTMLToMarkdown},
+}
+
 func (s *Store) migrate() error {
 	startedAt := time.Now()
 	slog.Info("database migration started")
@@ -63,6 +73,29 @@ func (s *Store) migrate() error {
 
 		appliedCount++
 		slog.Info("migration applied", "version", version, "file", entry.Name())
+	}
+
+	// Apply Go-based migrations.
+	for _, gm := range goMigrations {
+		if applied[gm.version] {
+			slog.Debug("Go migration already applied", "version", gm.version, "name", gm.name)
+			continue
+		}
+
+		slog.Info("applying Go migration", "version", gm.version, "name", gm.name)
+		if err := gm.migrate(s.db); err != nil {
+			return fmt.Errorf("apply Go migration %s: %w", gm.name, err)
+		}
+
+		if _, err := s.db.Exec(
+			"INSERT INTO schema_migrations (version) VALUES (:version)",
+			sql.Named("version", gm.version),
+		); err != nil {
+			return fmt.Errorf("record Go migration version: %w", err)
+		}
+
+		appliedCount++
+		slog.Info("Go migration applied", "version", gm.version, "name", gm.name)
 	}
 
 	slog.Info(
