@@ -117,10 +117,10 @@ func TestTranslateItem(t *testing.T) {
 	t.Run("returns cached translation for matching model and language", func(t *testing.T) {
 		h, st := newTranslationItemTestHandler(t, &config.Config{})
 		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
-		itemID := seedTranslationItemFixture(t, st, "Original title", "<p>Hello <strong>world</strong></p>")
+		itemID := seedTranslationItemFixture(t, st, "Original title", "**Hello** world")
 
 		cachedTitle := "Кэшированный заголовок"
-		cachedContent := "<p>Привет <strong>мир</strong></p>"
+		cachedContent := "**Привет** мир"
 		cachedExcerpt := "Привет мир"
 		if err := st.SaveItemTranslation(itemID, store.SaveItemTranslationInput{
 			TranslatedTitle:           &cachedTitle,
@@ -162,10 +162,10 @@ func TestTranslateItem(t *testing.T) {
 	t.Run("force refresh bypasses cache and persists a new translation", func(t *testing.T) {
 		h, st := newTranslationItemTestHandler(t, &config.Config{})
 		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
-		itemID := seedTranslationItemFixture(t, st, "Original title", "<p>Hello <strong>world</strong></p>")
+		itemID := seedTranslationItemFixture(t, st, "Original title", "**Hello** world")
 
 		cachedTitle := "Старый заголовок"
-		cachedContent := "<p>Старый <strong>контент</strong></p>"
+		cachedContent := "**Старый** контент"
 		if err := st.SaveItemTranslation(itemID, store.SaveItemTranslationInput{
 			TranslatedTitle:           &cachedTitle,
 			TranslatedContent:         &cachedContent,
@@ -178,7 +178,7 @@ func TestTranslateItem(t *testing.T) {
 
 		translator := &stubItemTranslator{responses: []stubTranslationResult{
 			{output: "Новый заголовок"},
-			{output: "[0] Привет\n[1] мир"},
+			{output: "**Привет** мир"},
 		}}
 		h.itemTranslator = translator
 
@@ -197,14 +197,11 @@ func TestTranslateItem(t *testing.T) {
 		if response.Data.TranslatedContent == nil {
 			t.Fatal("expected refreshed translated content to be present")
 		}
+		if *response.Data.TranslatedContent != "**Привет** мир" {
+			t.Fatalf("expected translated content to preserve Markdown formatting, got %q", *response.Data.TranslatedContent)
+		}
 		if response.Data.TranslatedExcerpt == nil || *response.Data.TranslatedExcerpt == "" {
 			t.Fatal("expected refreshed translated excerpt to be present")
-		}
-		if !validateHTMLStructure("<p>Hello <strong>world</strong></p>", *response.Data.TranslatedContent) {
-			t.Fatalf("expected translated content to preserve structure, got %q", *response.Data.TranslatedContent)
-		}
-		if !strings.Contains(*response.Data.TranslatedContent, "Привет") || !strings.Contains(*response.Data.TranslatedContent, "мир") {
-			t.Fatalf("expected translated content text to be updated, got %q", *response.Data.TranslatedContent)
 		}
 		if response.Data.TranslationUpdatedAt <= 1710000000 {
 			t.Fatalf("expected translation_updated_at to increase, got %d", response.Data.TranslationUpdatedAt)
@@ -239,14 +236,14 @@ func TestTranslateItem(t *testing.T) {
 		}
 	})
 
-	t.Run("plain text content is translated directly", func(t *testing.T) {
+	t.Run("markdown content is translated directly preserving formatting", func(t *testing.T) {
 		h, st := newTranslationItemTestHandler(t, &config.Config{})
 		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
-		itemID := seedTranslationItemFixture(t, st, "Original title", "Just plain text, no HTML tags here.")
+		itemID := seedTranslationItemFixture(t, st, "Original title", "## Hello\n\nSome **bold** text and [a link](https://example.com).")
 
 		translator := &stubItemTranslator{responses: []stubTranslationResult{
 			{output: "Перевод заголовка"},
-			{output: "Просто обычный текст, без HTML тегов."},
+			{output: "## Привет\n\nНекоторый **жирный** текст и [ссылка](https://example.com)."},
 		}}
 		h.itemTranslator = translator
 
@@ -262,36 +259,11 @@ func TestTranslateItem(t *testing.T) {
 		if response.Data.TranslatedTitle == nil || *response.Data.TranslatedTitle != "Перевод заголовка" {
 			t.Fatalf("expected translated title, got %#v", response.Data.TranslatedTitle)
 		}
-		if response.Data.TranslatedContent == nil || *response.Data.TranslatedContent != "Просто обычный текст, без HTML тегов." {
-			t.Fatalf("expected translated plain text content, got %#v", response.Data.TranslatedContent)
+		if response.Data.TranslatedContent == nil || *response.Data.TranslatedContent != "## Привет\n\nНекоторый **жирный** текст и [ссылка](https://example.com)." {
+			t.Fatalf("expected translated Markdown content, got %#v", response.Data.TranslatedContent)
 		}
-		if response.Data.TranslatedExcerpt == nil || *response.Data.TranslatedExcerpt != "Просто обычный текст, без HTML тегов." {
-			t.Fatalf("expected translated plain text excerpt, got %#v", response.Data.TranslatedExcerpt)
-		}
-	})
-
-	t.Run("rejects structurally invalid translated html and does not save", func(t *testing.T) {
-		h, st := newTranslationItemTestHandler(t, &config.Config{})
-		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
-		itemID := seedTranslationItemFixture(t, st, "Original title", "<p>Hello <strong>world</strong></p>")
-
-		translator := &stubItemTranslator{responses: []stubTranslationResult{
-			{output: "Перевод заголовка"},
-			{output: "[0] <div>сломано</div>\n[1] мир"},
-		}}
-		h.itemTranslator = translator
-
-		w := performRequest(h.SetupRouter(), http.MethodPost, fmt.Sprintf("/api/translation/items/%d", itemID), nil, nil)
-		if w.Code != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d body=%s", w.Code, w.Body.String())
-		}
-
-		item, err := st.GetItem(itemID)
-		if err != nil {
-			t.Fatalf("reload item: %v", err)
-		}
-		if item.TranslatedTitle != nil || item.TranslatedContent != nil || item.TranslationUpdatedAt != 0 {
-			t.Fatalf("expected no translation to be saved after invalid html, got %+v", item)
+		if response.Data.TranslatedExcerpt == nil || *response.Data.TranslatedExcerpt == "" {
+			t.Fatalf("expected translated excerpt to be present, got %#v", response.Data.TranslatedExcerpt)
 		}
 	})
 
@@ -317,18 +289,15 @@ func TestTranslateItem(t *testing.T) {
 		}
 	})
 
-	t.Run("translates html with unclosed p tags (HN-style)", func(t *testing.T) {
+	t.Run("translates markdown with code blocks and links preserved", func(t *testing.T) {
 		h, st := newTranslationItemTestHandler(t, &config.Config{})
 		mustSeedTranslationSettings(t, st, "sk-db-secret", "gpt-4o-mini", "ru")
-		// Unclosed <p> tags are valid HTML5 — browsers auto-close them.
-		// The parser normalises them: each <p> becomes properly closed.
-		content := "<p>Hello all<p>- Item one\n- Item two<p>Closing line</p>"
+		content := "Hello all\n\n- Item one\n- Item two\n\n[link](https://example.com)"
 		itemID := seedTranslationItemFixture(t, st, "Original title", content)
 
 		translator := &stubItemTranslator{responses: []stubTranslationResult{
 			{output: "Перевод заголовка"},
-			// LLM returns multi-line node [1] as continuation lines (no [N] prefix)
-			{output: "[0] Привет всем\n[1] - Пункт один\n- Пункт два\n[2] Заключение"},
+			{output: "Привет всем\n\n- Пункт один\n- Пункт два\n\n[ссылка](https://example.com)"},
 		}}
 		h.itemTranslator = translator
 
@@ -345,7 +314,10 @@ func TestTranslateItem(t *testing.T) {
 			t.Fatalf("expected translated content to contain 'Привет всем', got %q", *response.Data.TranslatedContent)
 		}
 		if !strings.Contains(*response.Data.TranslatedContent, "Пункт один") || !strings.Contains(*response.Data.TranslatedContent, "Пункт два") {
-			t.Fatalf("expected multi-line translation preserved, got %q", *response.Data.TranslatedContent)
+			t.Fatalf("expected list items to be translated, got %q", *response.Data.TranslatedContent)
+		}
+		if !strings.Contains(*response.Data.TranslatedContent, "[ссылка](https://example.com)") {
+			t.Fatalf("expected links to be preserved in translated content, got %q", *response.Data.TranslatedContent)
 		}
 	})
 }
@@ -353,69 +325,87 @@ func TestTranslateItem(t *testing.T) {
 func TestExtractPlainTextExcerpt(t *testing.T) {
 	tests := []struct {
 		name     string
-		html     string
+		markdown string
 		maxLen   int
 		expected string
 	}{
 		{
 			name:     "empty content",
-			html:     "",
+			markdown: "",
 			maxLen:   10,
 			expected: "",
 		},
 		{
-			name:     "no tags",
-			html:     "hello world",
+			name:     "plain text",
+			markdown: "hello world",
 			maxLen:   20,
 			expected: "hello world",
 		},
 		{
-			name:     "simple tags",
-			html:     "<p>hello</p> <strong>world</strong>",
+			name:     "strips images",
+			markdown: "![alt text](https://example.com/img.png) hello world",
 			maxLen:   20,
 			expected: "hello world",
 		},
 		{
-			name:     "nested tags",
-			html:     "<div><p>hello <span>world</span></p></div>",
+			name:     "strips links keeps text",
+			markdown: "[click here](https://example.com) hello world",
+			maxLen:   30,
+			expected: "click here hello world",
+		},
+		{
+			name:     "strips headings",
+			markdown: "## Hello World",
 			maxLen:   20,
-			expected: "hello world",
+			expected: "Hello World",
+		},
+		{
+			name:     "strips bold",
+			markdown: "This is **bold text** here",
+			maxLen:   30,
+			expected: "This is bold text here",
+		},
+		{
+			name:     "strips inline code",
+			markdown: "Use `fmt.Println` to print",
+			maxLen:   30,
+			expected: "Use fmt.Println to print",
+		},
+		{
+			name:     "strips fenced code blocks",
+			markdown: "Before\n```\ncode here\n```\nAfter",
+			maxLen:   30,
+			expected: "Before After",
 		},
 		{
 			name:     "whitespace collapsing",
-			html:     "  hello \n\t world  ",
+			markdown: "  hello \n\t world  ",
 			maxLen:   20,
 			expected: "hello world",
 		},
 		{
 			name:     "truncation at rune boundary",
-			html:     "hello world",
+			markdown: "hello world",
 			maxLen:   5,
 			expected: "hello",
 		},
 		{
 			name:     "multi-byte runes truncation",
-			html:     "Привет мир", // "Привет" is 6 runes
+			markdown: "Привет мир",
 			maxLen:   6,
 			expected: "Привет",
 		},
 		{
-			name:     "html entities decoding",
-			html:     "hello &amp; world",
-			maxLen:   20,
-			expected: "hello & world",
-		},
-		{
-			name:     "script and style tags (should be stripped)",
-			html:     "<script>alert(1)</script>hello<style>body{}</style>",
-			maxLen:   20,
-			expected: "hello",
+			name:     "combined markdown stripping",
+			markdown: "# Title\n\n![img](url) [link](url) **bold** `code`",
+			maxLen:   40,
+			expected: "Title link bold code",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := extractPlainTextExcerpt(tt.html, tt.maxLen)
+			actual := extractPlainTextExcerpt(tt.markdown, tt.maxLen)
 			if actual != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, actual)
 			}
