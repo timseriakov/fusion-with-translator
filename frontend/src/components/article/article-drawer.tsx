@@ -35,6 +35,7 @@ import { useArticleNavigation } from "@/hooks/use-keyboard";
 import { useI18n } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
 import { processArticleContent } from "@/lib/content";
+import { MarkdownRenderer } from "./markdown-renderer";
 import { getFaviconUrl } from "@/lib/api/favicon";
 import { FeedFavicon } from "@/components/feed/feed-favicon";
 import { toSafeExternalUrl } from "@/lib/safe-url";
@@ -380,16 +381,14 @@ export function ArticleDrawer() {
                   </div>
                 </div>
 
-                <div
+                <MarkdownRenderer
                   className="prose prose-neutral mt-6 min-w-0 max-w-none break-words dark:prose-invert"
-                  dangerouslySetInnerHTML={{
-                    __html: processArticleContent(
-                      showTranslated && article.translated_content
-                        ? article.translated_content
-                        : article.content,
-                      safeArticleLink ?? undefined,
-                    ),
-                  }}
+                  content={processArticleContent(
+                    showTranslated && article.translated_content
+                      ? article.translated_content
+                      : article.content,
+                    safeArticleLink ?? undefined,
+                  )}
                 />
               </article>
             </ScrollArea>
