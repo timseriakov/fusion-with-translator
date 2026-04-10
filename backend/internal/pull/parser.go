@@ -13,6 +13,7 @@ import (
 
 	"github.com/0x2E/fusion/internal/model"
 	"github.com/0x2E/fusion/internal/pkg/httpc"
+	"github.com/0x2E/fusion/internal/pkg/md"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -224,11 +225,20 @@ func mapItem(item *gofeed.Item, baseURL *url.URL) *ParsedItem {
 		guid = fallbackGUID(item.Title, content, sourcePubDate, hasSourcePubDate)
 	}
 
+	// Convert HTML content to Markdown for storage.
+	// fallbackGUID already consumed the raw content above, so this is safe.
+	mdContent := content
+	if mdContent != "" {
+		if converted, err := md.FromHTML(mdContent); err == nil {
+			mdContent = converted
+		}
+	}
+
 	return &ParsedItem{
 		GUID:    guid,
 		Title:   item.Title,
 		Link:    link,
-		Content: content,
+		Content: mdContent,
 		PubDate: pubDate,
 	}
 }
