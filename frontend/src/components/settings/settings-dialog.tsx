@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Bug, Download, Github, Info, Keyboard, Palette, Wrench } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -246,7 +246,8 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={isSettingsOpen} onOpenChange={setSettingsOpen}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:flex-row h-auto sm:h-[560px] sm:max-w-4xl gap-0 overflow-hidden p-0">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:flex-row h-auto sm:h-[560px] sm:max-w-4xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">{t("common.settings")}</DialogTitle>
         {/* Sidebar (desktop) / Tab bar (mobile) */}
         <div className="flex shrink-0 flex-row border-b border-border bg-muted/30 px-3 pt-3 sm:w-[200px] sm:flex-col sm:border-b-0 sm:border-r sm:pt-4">
           <h2 className="hidden px-2 text-sm font-semibold sm:block">
